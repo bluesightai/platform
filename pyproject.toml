@@ -1,0 +1,45 @@
+[tool.poetry]
+name = "clay"
+version = "0.1.0"
+description = ""
+authors = ["Alexander Smirnov <alex@asmirnov.xyz>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.13"
+torch = {version = "2.3.1", source = "pytorch-cpu"}
+torchvision = {version = "0.18.1", source = "pytorch-cpu"}
+einops = "0.7.0"
+vit-pytorch = "1.6.4"
+transformers = "^4.42.2"
+loguru = "^0.7.2"
+pydantic-settings = "^2.3.4"
+python-box = "^7.2.0"
+stackstac = "0.5.0"
+pystac-client = "^0.8.2"
+geopandas = "^1.0.0"
+shapely = "^2.0.4"
+malevich = {url = "https://github.com/MalevichAI/malevich/archive/dev/unstable.zip"}
+
+[tool.poetry.group.dev.dependencies]
+black = "^24.4.2"
+isort = "^5.13.2"
+traitlets = "5.9.0"
+notebook = "6.4.12"
+jupyter = "^1.0.0"
+jupyter-contrib-nbextensions = "^0.7.0"
+
+[tool.black]
+line-length = 120
+
+[tool.isort]
+line_length = 120
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "explicit"
