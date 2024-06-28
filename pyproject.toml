@@ -6,7 +6,7 @@ authors = ["Alexander Smirnov <alex@asmirnov.xyz>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.13"
+python = ">=3.10,<3.13"
 torch = {version = "2.3.1", source = "pytorch-cpu"}
 torchvision = {version = "0.18.1", source = "pytorch-cpu"}
 einops = "0.7.0"
@@ -20,7 +20,7 @@ pystac-client = "^0.8.2"
 geopandas = "^1.0.0"
 shapely = "^2.0.4"
 kafka-python-ng = "^2.2.2"
-malevich = {url = "https://github.com/MalevichAI/malevich/archive/dev/unstable.zip"}
+# malevich = {url = "https://github.com/MalevichAI/malevich/archive/dev/unstable.zip"}
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.4.2"
