@@ -19,6 +19,7 @@ stackstac = "0.5.0"
 pystac-client = "^0.8.2"
 geopandas = "^1.0.0"
 shapely = "^2.0.4"
+kafka-python-ng = "^2.2.2"
 malevich = {url = "https://github.com/MalevichAI/malevich/archive/dev/unstable.zip"}
 
 [tool.poetry.group.dev.dependencies]

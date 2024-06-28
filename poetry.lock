@@ -818,8 +818,8 @@ isort = ">=4.3.21,<6.0"
 jinja2 = ">=2.10.1,<4.0"
 packaging = "*"
 pydantic = [
-    {version = ">=1.10.0,<2.4.0 || >2.4.0,<3.0", extras = ["email"], markers = "python_version >= \"3.11\" and python_version < \"3.12\""},
     {version = ">=1.10.0,<2.0.0 || >2.0.0,<2.0.1 || >2.0.1,<2.4.0 || >2.4.0,<3.0", extras = ["email"], markers = "python_version >= \"3.12\" and python_version < \"4.0\""},
+    {version = ">=1.10.0,<2.4.0 || >2.4.0,<3.0", extras = ["email"], markers = "python_version >= \"3.11\" and python_version < \"3.12\""},
 ]
 pyyaml = ">=6.0.1"
 
@@ -2099,6 +2099,24 @@ files = [
 crc32c = ["crc32c"]
 
 [[package]]
+name = "kafka-python-ng"
+version = "2.2.2"
+description = "Pure Python client for Apache Kafka"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "kafka-python-ng-2.2.2.tar.gz", hash = "sha256:87ad3a766e2c0bec71d9b99bdd9e9c5cda62d96cfda61a8ca16510484d6ad7d4"},
+    {file = "kafka_python_ng-2.2.2-py2.py3-none-any.whl", hash = "sha256:3fab1a03133fade1b6fd5367ff726d980e59031c4aaca9bf02c516840a4f8406"},
+]
+
+[package.extras]
+boto = ["botocore"]
+crc32c = ["crc32c"]
+lz4 = ["lz4"]
+snappy = ["python-snappy"]
+zstd = ["zstandard"]
+
+[[package]]
 name = "keyring"
 version = "25.2.1"
 description = "Store and access your passwords safely."
@@ -2946,8 +2964,8 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.23.2", markers = "python_version == \"3.11\""},
     {version = ">=1.26.0", markers = "python_version >= \"3.12\""},
+    {version = ">=1.23.2", markers = "python_version == \"3.11\""},
 ]
 python-dateutil = ">=2.8.2"
 pytz = ">=2020.1"
@@ -5238,13 +5256,13 @@ test = ["argcomplete (>=2.0)", "pre-commit", "pytest", "pytest-mock"]
 
 [[package]]
 name = "transformers"
-version = "4.42.2"
+version = "4.42.3"
 description = "State-of-the-art Machine Learning for JAX, PyTorch and TensorFlow"
 optional = false
 python-versions = ">=3.8.0"
 files = [
-    {file = "transformers-4.42.2-py3-none-any.whl", hash = "sha256:dfaa543c5907ade528b6f9dff0ee15dba5be4938a35e465caa5734bad0d77446"},
-    {file = "transformers-4.42.2.tar.gz", hash = "sha256:dbbb0bbfadcd7ca6ec0ec2cef1d12f62a0778fc2d376cd663c6fd0b9dba75ab8"},
+    {file = "transformers-4.42.3-py3-none-any.whl", hash = "sha256:a61a0df9609b7d69229d941b2fd857c841ba3043d6da503d0da1a4b133f65b92"},
+    {file = "transformers-4.42.3.tar.gz", hash = "sha256:7539873ff45809145265cbc94ea4619d2713c41ceaa277b692d8b0be3430f7eb"},
 ]
 
 [package.dependencies]
@@ -5804,4 +5822,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<3.13"
-content-hash = "de37e4159da6e02726c7977b9ab61025aa53f8d28e8977e46f28efdcaf6ac269"
+content-hash = "68ebd1b5321250945a5c7fab73e084d50580a3de880fce8bb76fce44953cc705"
