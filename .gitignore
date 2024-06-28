@@ -4,3 +4,4 @@ __pycache__
 indexes/
 models/
 .cache/
+malevich.secrets.yaml
