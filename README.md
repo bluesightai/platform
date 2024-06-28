@@ -2,8 +2,7 @@ Welcome to Malevich! Here are simple steps to start building on our platform:
 
 ## Before anything
 
-Before starting, you have to register on either [Space](https://space.malevich.ai/) or [Dev Space](https://dev.space.malevich.ai/). After that,
-install a `malevich` package from development upstream using the following command:
+Before starting, you have to register on either [Space](https://space.malevich.ai/) or [Dev Space](https://dev.space.malevich.ai/). After that, install a `malevich` package from development upstream using the following command:
 
 ```bash
 pip install https://github.com/MalevichAI/malevich/archive/dev/unstable.zip
@@ -49,7 +48,7 @@ malevich core assets list
 
 >>>
 
-assets 
+assets
 └── example_file.txt
 
 <<<
@@ -66,8 +65,7 @@ def write_asset_file(just_input: DF, context: Context):
 
 ```
 
-And then write a dummy flow just to test it. A flow should contain at least two nodes, 
-so we pass a collection with dummy data to check the processor.
+And then write a dummy flow just to test it. A flow should contain at least two nodes, so we pass a collection with dummy data to check the processor.
 
 ```python
 
@@ -80,22 +78,20 @@ def just_test_asset():
 
 ## Building and Using Apps
 
-To run the app on the platform it should be built and pushed to Docker registry. You may use public and private Docker image registries
-for this (GHCR, AWS, Dockerhub). Check more information at [Docs](https://docs.malevich.ai/SDK/Apps/Building.html#building-an-app). Shortly, I have built the image with:
+To run the app on the platform it should be built and pushed to Docker registry. You may use public and private Docker image registries for this (GHCR, AWS, Dockerhub). Check more information at [Docs](https://docs.malevich.ai/SDK/Apps/Building.html#building-an-app). Shortly, I have built the image with:
 
 ```bash
 (cd clay/ && docker build -t teexone/malevich:clay . && docker push teexone/malevich:clay)
 ```
 
-and then installed it with 
+and then installed it with
 
 ```bash
 malevich use image clay teexone/malevich:clay
 ```
 
-After the installation, the app appears as 
+After the installation, the app appears as
 
 ```
 from malevich.clay import ... # processors
 ```
-
