@@ -22,8 +22,12 @@ RUN python3 -m venv $POETRY_VENV \
 	&& $POETRY_VENV/bin/pip install poetry==${POETRY_VERSION}
 
 COPY poetry.lock pyproject.toml ./
-RUN poetry export --without-hashes -f requirements.txt --output requirements.txt
-RUN pip install --default-timeout=100 -r requirements.txt
+RUN poetry export --without-hashes -f requirements.txt --output export.txt
+RUN pip install -r export.txt
+
+RUN python -c "\
+from huggingface_hub import hf_hub_download; \
+hf_hub_download(repo_id='made-with-clay/Clay', filename='clay-v1-base.ckpt')"
 
 # Placing source code into the image
 # DO NOT change this line
