@@ -73,18 +73,13 @@ class Encoder(nn.Module):
             .to(patches.device)
             .detach()
         )  # [L (D - 8)]
-        logger.info(" pos_encoding is", pos_encoding.shape, "It should be  [L (D - 8)]")
 
         time_latlon = torch.hstack((time, latlon)).to(patches.device).detach()  # [B 8]
-        logger.info("time_latlon is", time_latlon.shape, "It should be  [B 8]")
 
         pos_encoding = repeat(pos_encoding, "L D -> B L D", B=B)  # [B L (D - 8)]
-        logger.info("repeated pos_encoding is", pos_encoding.shape, "It should be  [B L (D - 8)]")
 
         time_latlon = repeat(time_latlon, "B D -> B L D", L=L)  # [B L 8]
-        logger.info("repeated time_latlon is", time_latlon.shape, "It should be  [B L 8]")
         pos_metadata_encoding = torch.cat((pos_encoding, time_latlon), dim=-1)  # [B L D]
-        logger.info("JUST BEFORE ADDING, PATCHES ARE", patches.shape, "METADATA", pos_metadata_encoding.shape)
 
         patches = patches + pos_metadata_encoding  # [B L D] + [B L D] -> [B L D]
         return patches  # [B L D]
