@@ -38,5 +38,5 @@ COPY ./clay ./clay
 RUN touch README.md # required by poetry
 RUN poetry config virtualenvs.create false && poetry install --no-interaction --no-dev
 
-COPY ./clay/malevich_bindings.py ./apps/
+COPY ./clay/malevich/bindings.py ./apps/
 # CMD [ "python", "clay/model.py" ]

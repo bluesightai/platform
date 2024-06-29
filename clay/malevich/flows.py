@@ -1,6 +1,7 @@
 from malevich import Core, flow
 from malevich.clay import inference
-from utils import get_mock_data
+
+from clay.utils import get_mock_data
 
 
 @flow(reverse_id="inference")
