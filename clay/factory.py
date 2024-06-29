@@ -9,8 +9,7 @@ import torch.nn.functional as F
 from einops import rearrange
 from torch import nn
 
-# from src.utils import posemb_sincos_1d
-from utils import posemb_sincos_1d
+from clay.utils import posemb_sincos_1d
 
 
 class FCBlock(nn.Module):

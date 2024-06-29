@@ -3,14 +3,15 @@ import os
 import re
 
 import torch
-from args import args, device
 from einops import rearrange, repeat
-from factory import DynamicEmbedding
 from huggingface_hub import hf_hub_download
 from loguru import logger
 from torch import nn
-from utils import get_mock_data, posemb_sincos_2d_with_gsd, stack_to_datacube
 from vit_pytorch.simple_vit import Transformer
+
+from clay.args import args, device
+from clay.factory import DynamicEmbedding
+from clay.utils import get_mock_data, posemb_sincos_2d_with_gsd, stack_to_datacube
 
 torch.set_float32_matmul_precision("medium")
 os.environ["TORCH_CUDNN_V8_API_DISABLED"] = "1"
@@ -228,7 +229,7 @@ if __name__ == "__main__":
 
     encoder = get_encoder()
 
-    stack, lat, long = get_mock_data()
+    (stack, lat, long), _ = get_mock_data()
     datacube = stack_to_datacube(stack, lat, long)
 
     logger.info(stack)
