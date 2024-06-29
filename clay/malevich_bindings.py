@@ -8,51 +8,30 @@ https://malevichai.github.io/malevich/Apps/Building.html
 
 """
 
-from typing import Any, List, Tuple
+from typing import Any, List
 
 import numpy as np
 import pandas as pd
 import stackstac
 import torch
-from malevich import table
 from malevich.square import DF, Context, init, processor, scheme
-from model import get_encoder
-from rasterio.enums import Resampling
-from stackstac.stack import Bbox
-from utils import stack_to_datacube
-from xarray import DataArray
+
+from clay.model import get_encoder
+from clay.utils import InputEarthData, stack_to_datacube
 
 
 @scheme()
-class InputEarthData:
-    items: List[Any]
-    bounds: Bbox
-    snap_bounds: bool
-    epsg: int
-    resolution: int
-    dtype: np.dtype
-    rescale: bool
-    fill_value: int | float
-    assets: List[str]
-    resampling: Resampling
-    lat: float
-    long: float
+class MalevichInputEarthData(InputEarthData):
+    pass
 
 
-# @scheme()
-# class ModelConfiguration:
-#     # TODO: Specify tweakable configurations for each run
-#     pass
-#
-#
 @init(prepare=True)
 def init_model(context: Context):
     context.model = get_encoder()
 
 
 @processor()
-def inference(inputs: InputEarthData, context: Context):
-    # config: ModelConfiguration = context.app_cfg
+def inference(inputs: MalevichInputEarthData, context: Context):
 
     stack = stackstac.stack(
         inputs.items,
@@ -60,7 +39,7 @@ def inference(inputs: InputEarthData, context: Context):
         snap_bounds=inputs.snap_bounds,
         epsg=inputs.epsg,
         resolution=inputs.resolution,
-        dtype=inputs.dtype,
+        # dtype=inputs.dtype,
         rescale=inputs.rescale,
         fill_value=inputs.fill_value,
         assets=inputs.assets,
@@ -86,4 +65,3 @@ def mock_inference(inputs: DF[InputEarthData], context: Context):
 def write_asset_file(just_input: DF, context: Context):
     with open(context.get_object("example_file.txt").path) as f:
         return pd.DataFrame([f.read()], columns=["contents"])
-
