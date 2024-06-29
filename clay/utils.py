@@ -12,12 +12,28 @@ import pandas as pd
 import pystac_client
 import stackstac
 import torch
-import torch.nn.functional as F
-from args import args, device, metadata
+from pydantic import BaseModel
 from rasterio.enums import Resampling
 from shapely import Point
+from stackstac.stack import Bbox
 from torchvision.transforms import v2
 from xarray import DataArray
+
+from clay.args import args, device, metadata
+
+
+class InputEarthData(BaseModel):
+    items: List[Any]
+    bounds: Bbox
+    snap_bounds: bool
+    epsg: int
+    resolution: int
+    rescale: bool
+    fill_value: Union[int, float]
+    assets: List[str]
+    resampling: Resampling
+    lat: float
+    long: float
 
 
 def posemb_sincos_2d(h, w, dim, temperature: int = 10000, dtype=torch.float32):
