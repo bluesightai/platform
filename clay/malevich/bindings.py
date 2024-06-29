@@ -17,7 +17,7 @@ import torch
 from malevich.square import DF, Context, init, processor, scheme
 
 from clay.model import get_encoder
-from clay.utils import InputEarthData, stack_to_datacube
+from clay.utils import InputEarthData, get_mock_data, stack_to_datacube
 
 
 @scheme()
@@ -28,6 +28,13 @@ class MalevichInputEarthData(InputEarthData):
 @init(prepare=True)
 def init_model(context: Context):
     context.model = get_encoder()
+
+
+@processor()
+def get_malevich_mock_data() -> MalevichInputEarthData:
+    data = get_mock_data()[1]
+    malevich_data = MalevichInputEarthData(**data.__dict__)
+    return malevich_data
 
 
 @processor()
@@ -45,6 +52,7 @@ def inference(inputs: MalevichInputEarthData, context: Context):
         assets=inputs.assets,
         resampling=inputs.resampling,
     )
+    stack = stack.compute()
     datacube = stack_to_datacube(stack, inputs.lat, inputs.long)
     with torch.no_grad():
         unmsk_patch, unmsk_idx, msk_idx, msk_matrix = context.model(datacube)
