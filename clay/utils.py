@@ -4,7 +4,7 @@ Code from https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/simple
 """
 
 import math
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import geopandas as gpd
 import numpy as np
@@ -89,7 +89,7 @@ def normalize_latlon(lat, lon):
     return (math.sin(lat), math.cos(lat)), (math.sin(lon), math.cos(lon))
 
 
-def get_mock_data() -> Tuple[DataArray, float, float]:
+def get_mock_data() -> Tuple[Tuple[DataArray, float, float], InputEarthData]:
     # Point over Monchique Portugal
     lat, lon = 37.30939, -8.57207
 
@@ -137,7 +137,7 @@ def get_mock_data() -> Tuple[DataArray, float, float]:
     # Create bounds in projection
     size = 256
     gsd = 10
-    bounds = (
+    bounds: Bbox = (
         coords[0] - (size * gsd) // 2,
         coords[1] - (size * gsd) // 2,
         coords[0] + (size * gsd) // 2,
@@ -150,16 +150,30 @@ def get_mock_data() -> Tuple[DataArray, float, float]:
         snap_bounds=False,
         epsg=epsg,
         resolution=gsd,
-        dtype=np.dtype("float32"),
+        # dtype=np.dtype("float32"),
         rescale=False,
         fill_value=0,
         assets=["blue", "green", "red", "nir"],
         resampling=Resampling.nearest,
     )
+    input_earth_data: InputEarthData = InputEarthData(
+        items=items,
+        bounds=bounds,
+        snap_bounds=False,
+        epsg=epsg,
+        resolution=gsd,
+        # dtype=np.dtype("float32"),
+        rescale=False,
+        fill_value=0,
+        assets=["blue", "green", "red", "nir"],
+        resampling=Resampling.nearest,
+        lat=lat,
+        long=lon,
+    )
 
     stack = stack.compute()
 
-    return stack, lat, lon
+    return (stack, lat, lon), input_earth_data
 
 
 def stack_to_datacube(stack: DataArray, lat: float, long: float) -> Dict[str, Any]:
@@ -168,9 +182,9 @@ def stack_to_datacube(stack: DataArray, lat: float, long: float) -> Dict[str, An
     std = []
     waves = []
     for band in stack.band:
-        mean.append(metadata[args.platform].bands.mean[str(band.values)])
-        std.append(metadata[args.platform].bands.std[str(band.values)])
-        waves.append(metadata[args.platform].bands.wavelength[str(band.values)])
+        mean.append(metadata[args.platform]["bands"]["mean"][str(band.values)])
+        std.append(metadata[args.platform]["bands"]["std"][str(band.values)])
+        waves.append(metadata[args.platform]["bands"]["wavelength"][str(band.values)])
 
     # Prepare the normalization transform function using the mean and std values.
     transform = v2.Compose(
