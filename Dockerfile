@@ -1,13 +1,3 @@
-# This file is an auto-generated Dockerfile for the 
-# Malevich App image. You may edit this file to add
-# additional dependencies to your app or set more
-# specific enironment.
-
-# Keep in mind, that source code containing
-# Malevich-specific code (declaration of processors, inits, etc.)
-# should be placed into ./apps directory
-
-# NOTE: CUDA will be available at Nebius
 FROM malevichai/app:python-torch_v0.1
 # FROM python:3.11
 
