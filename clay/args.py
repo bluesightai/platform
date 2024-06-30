@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 from pydantic_settings import BaseSettings
 
@@ -8,6 +10,19 @@ class Args(BaseSettings):
     hub_repo_id: str = "made-with-clay/Clay"
     hub_filename: str = "clay-v1-base.ckpt"
     platform: str = "sentinel-2-l2a"
+    stac_api_url: str = "https://earth-search.aws.element84.com/v1"
+    assets: List[str] = [
+        "blue",
+        "green",
+        "red",
+        "nir",
+        # "rededge1",
+        # "rededge2",
+        # "rededge3",
+        # "nir08",
+        # "swir16",
+        # "swir32",
+    ]
 
 
 args = Args()
