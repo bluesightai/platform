@@ -20,6 +20,7 @@ pystac-client = "^0.8.2"
 geopandas = "^1.0.0"
 shapely = "^2.0.4"
 kafka-python-ng = "^2.2.2"
+matplotlib = "^3.9.0"
 # malevich = {url = "https://github.com/MalevichAI/malevich/archive/dev/unstable.zip"}
 
 [tool.poetry.group.dev.dependencies]
@@ -30,7 +31,6 @@ notebook = "6.4.12"
 jupyter = "^1.0.0"
 jupyter-contrib-nbextensions = "^0.7.0"
 jupyterlab = "^4.2.3"
-matplotlib = "^3.9.0"
 
 [tool.black]
 line-length = 120

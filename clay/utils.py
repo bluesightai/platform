@@ -2,6 +2,7 @@ import math
 from typing import Any, Dict, List
 
 import geopandas as gpd
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import pystac
@@ -194,6 +195,13 @@ def get_stack(lat: float, lon: float, items: List[pystac.Item], size: int = 64, 
     stack = stack.compute()
 
     return stack
+
+
+def visualize_stack(stack):
+    stack.sel(band=["red", "green", "blue"]).plot.imshow(row="time", rgb="band", vmin=0, vmax=2000, col_wrap=6)
+    for ax in plt.gcf().axes:
+        ax.set_aspect("equal")
+    plt.show()
 
 
 def stack_to_datacube(lat: float, lon: float, stack: DataArray) -> Dict[str, Any]:
