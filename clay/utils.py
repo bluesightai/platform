@@ -1,5 +1,5 @@
 import math
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -51,6 +51,54 @@ def shift_longitude(lat: float, pixel_shift: int, gsd: int) -> float:
     shift_meters = pixel_shift * gsd
     longitude_shift = shift_meters / (111320 * math.cos(lat_rad))
     return longitude_shift
+
+
+def get_square_centers(
+    nw_lat: float, nw_lon: float, se_lat: float, se_lon: float, pixel_shift: int, gsd: int
+) -> List[Tuple[float, float]]:
+    centers = []
+    current_lat = nw_lat
+    latitude_shift = shift_latitude(pixel_shift, gsd)
+    while current_lat >= se_lat:
+        current_lon = nw_lon
+        while current_lon <= se_lon:
+            centers.append((current_lat, current_lon))
+            current_lon += shift_longitude(current_lat, pixel_shift, gsd)
+        current_lat -= latitude_shift
+    return centers
+
+
+def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371.0
+
+    lat1_rad = math.radians(lat1)
+    lon1_rad = math.radians(lon1)
+    lat2_rad = math.radians(lat2)
+    lon2_rad = math.radians(lon2)
+
+    dlat = lat2_rad - lat1_rad
+    dlon = lon2_rad - lon1_rad
+
+    a = math.sin(dlat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2) ** 2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    distance = R * c
+    return distance
+
+
+def find_closest_point(centers: List[Tuple[float, float]], target_lat: float, target_lon: float) -> Tuple[float, float]:
+    closest_point = centers[0]
+    min_distance = float("inf")
+
+    for center in centers:
+        center_lat, center_lon = center
+        distance = haversine_distance(center_lat, center_lon, target_lat, target_lon)
+
+        if distance < min_distance:
+            min_distance = distance
+            closest_point = center
+
+    return closest_point
 
 
 def posemb_sincos_2d(h, w, dim, temperature: int = 10000, dtype=torch.float32):
