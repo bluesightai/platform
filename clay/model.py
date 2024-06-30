@@ -11,7 +11,7 @@ from vit_pytorch.simple_vit import Transformer
 
 from clay.args import args, device
 from clay.factory import DynamicEmbedding
-from clay.utils import get_mock_data, posemb_sincos_2d_with_gsd, stack_to_datacube
+from clay.utils import get_catalog_items, get_stack, posemb_sincos_2d_with_gsd, stack_to_datacube
 
 torch.set_float32_matmul_precision("medium")
 os.environ["TORCH_CUDNN_V8_API_DISABLED"] = "1"
@@ -225,20 +225,23 @@ def get_encoder() -> Encoder:
     return encoder
 
 
-if __name__ == "__main__":
-
-    encoder = get_encoder()
-
-    (stack, lat, long), _ = get_mock_data()
-    datacube = stack_to_datacube(stack, lat, long)
-
-    logger.info(stack)
-
+def get_embedding(lat: float, lon: float, start: str = "2024-01-01", end: str = "2024-05-01", size: int = 64):
+    logger.info(f"Building embedding for at ({lat}, {lon}) from {start} to {end} for {size} size!")
+    items = get_catalog_items(lat=lat, lon=lon, start=start, end=end)
+    stack = get_stack(lat=lat, lon=lon, items=items, size=size)
+    datacube = stack_to_datacube(lat=lat, lon=lon, stack=stack)
+    logger.info("Running model inference...")
     with torch.no_grad():
         unmsk_patch, unmsk_idx, msk_idx, msk_matrix = encoder(datacube)
+    embedding = unmsk_patch[:, 0, :].cpu().numpy()
+    return embedding
 
-    # The first embedding is the class token, which is the
-    # overall single embedding. We extract that for PCA below.
-    embeddings = unmsk_patch[:, 0, :].cpu().numpy()
 
-    logger.info(embeddings)
+encoder = get_encoder()
+
+if __name__ == "__main__":
+
+    lat, lon = 51.555997989240666, -0.2800146693353107
+    start_date, end_date = "2024-01-01", "2024-05-01"
+    embedding = get_embedding(lat=lat, lon=lon, start=start_date, end=end_date, size=64)
+    logger.info(embedding.shape)
