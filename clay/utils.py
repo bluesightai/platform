@@ -1,18 +1,14 @@
-"""
-Code from https://github.com/lucidrains/vit-pytorch/blob/main/vit_pytorch/simple_vit.py
-
-"""
-
 import math
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List
 
 import geopandas as gpd
 import numpy as np
 import pandas as pd
+import pystac
 import pystac_client
 import stackstac
 import torch
-from pydantic import BaseModel
+from loguru import logger
 from rasterio.enums import Resampling
 from shapely import Point
 from stackstac.stack import Bbox
@@ -20,20 +16,6 @@ from torchvision.transforms import v2
 from xarray import DataArray
 
 from clay.args import args, device, metadata
-
-
-class InputEarthData(BaseModel):
-    items: List[Any]
-    bounds: Bbox
-    snap_bounds: bool
-    epsg: int
-    resolution: int
-    rescale: bool
-    fill_value: Union[int, float]
-    assets: List[str]
-    resampling: Resampling
-    lat: float
-    long: float
 
 
 def posemb_sincos_2d(h, w, dim, temperature: int = 10000, dtype=torch.float32):
@@ -89,40 +71,48 @@ def normalize_latlon(lat, lon):
     return (math.sin(lat), math.cos(lat)), (math.sin(lon), math.cos(lon))
 
 
-def get_mock_data() -> Tuple[Tuple[DataArray, float, float], InputEarthData]:
-    # Point over Monchique Portugal
-    lat, lon = 37.30939, -8.57207
+def get_catalog_items(
+    lat: float,
+    lon: float,
+    start: str = "2024-01-01",
+    end: str = "2024-05-01",
+    bb_offset: float = 1e-5,
+    max_items: int = 1,
+) -> List[pystac.Item]:
 
-    # Dates of a large forest fire
-    start = "2018-07-01"
-    end = "2018-09-01"
-
-    STAC_API = "https://earth-search.aws.element84.com/v1"
-    COLLECTION = "sentinel-2-l2a"
-
-    # Search the catalogue
-    catalog = pystac_client.Client.open(STAC_API)
-    search = catalog.search(
-        collections=[COLLECTION],
-        datetime=f"{start}/{end}",
-        bbox=(lon - 1e-5, lat - 1e-5, lon + 1e-5, lat + 1e-5),
-        max_items=100,
-        query={"eo:cloud_cover": {"lt": 80}},
+    logger.info(
+        f"Searching catalogue for {max_items} item(s) at ({lat}, {lon}) from {start} to {end} with {bb_offset} offset..."
     )
 
-    all_items = search.get_all_items()
+    # Search the catalogue
+    catalog = pystac_client.Client.open(args.stac_api_url)
+    search = catalog.search(
+        collections=[args.platform],
+        datetime=f"{start}/{end}",
+        bbox=(lon - bb_offset, lat - bb_offset, lon + bb_offset, lat + bb_offset),
+        max_items=max_items,
+        query={"eo:cloud_cover": {"lt": 5}},
+        sortby="properties.eo:cloud_cover",
+    )
+
+    all_items = search.item_collection()
 
     # Reduce to one per date (there might be some duplicates
     # based on the location)
-    items = []
-    dates = []
+    items: List[pystac.Item] = []
+    dates = set()
     for item in all_items:
-        if item.datetime.date() not in dates:
+        if item.datetime and item.datetime.date() not in dates:
             items.append(item)
-            dates.append(item.datetime.date())
+            dates.add(item.datetime.date())
 
-    # Extract coordinate system from first item
-    epsg = items[0].properties["proj:epsg"]
+    if not items:
+        raise ValueError("Unable to find any items at ({lat}, {lon}) from {start} to {end} with {bb_offset} offset!")
+
+    return items
+
+
+def get_bounds(lat: float, lon: float, epsg: int, gsd: int = 10, size: int = 64) -> Bbox:
 
     # Convert point of interest into the image projection
     # (assumes all images are in the same projection)
@@ -132,11 +122,12 @@ def get_mock_data() -> Tuple[Tuple[DataArray, float, float], InputEarthData]:
         geometry=[Point(lon, lat)],
     ).to_crs(epsg)
 
+    if poidf is None:
+        raise ValueError("DataFrame is empty!")
+
     coords = poidf.iloc[0].geometry.coords[0]
 
     # Create bounds in projection
-    size = 256
-    gsd = 10
     bounds: Bbox = (
         coords[0] - (size * gsd) // 2,
         coords[1] - (size * gsd) // 2,
@@ -144,39 +135,34 @@ def get_mock_data() -> Tuple[Tuple[DataArray, float, float], InputEarthData]:
         coords[1] + (size * gsd) // 2,
     )
 
-    stack = stackstac.stack(
+    return bounds
+
+
+def get_stack(lat: float, lon: float, items: List[pystac.Item], size: int = 64, gsd: int = 10) -> DataArray:
+
+    # Extract coordinate system from first item
+    epsg: int = items[0].properties["proj:epsg"]
+
+    bounds = get_bounds(lat=lat, lon=lon, epsg=epsg, gsd=gsd, size=size)
+
+    stack: DataArray = stackstac.stack(
         items,
         bounds=bounds,
         snap_bounds=False,
         epsg=epsg,
         resolution=gsd,
-        # dtype=np.dtype("float32"),
+        dtype=np.dtype("float32"),
         rescale=False,
         fill_value=0,
-        assets=["blue", "green", "red", "nir"],
+        assets=args.assets,
         resampling=Resampling.nearest,
     )
-    input_earth_data: InputEarthData = InputEarthData(
-        items=items,
-        bounds=bounds,
-        snap_bounds=False,
-        epsg=epsg,
-        resolution=gsd,
-        # dtype=np.dtype("float32"),
-        rescale=False,
-        fill_value=0,
-        assets=["blue", "green", "red", "nir"],
-        resampling=Resampling.nearest,
-        lat=lat,
-        long=lon,
-    )
-
     stack = stack.compute()
 
-    return (stack, lat, lon), input_earth_data
+    return stack
 
 
-def stack_to_datacube(stack: DataArray, lat: float, long: float) -> Dict[str, Any]:
+def stack_to_datacube(lat: float, lon: float, stack: DataArray) -> Dict[str, Any]:
 
     mean = []
     std = []
@@ -198,7 +184,7 @@ def stack_to_datacube(stack: DataArray, lat: float, long: float) -> Dict[str, An
     week_norm = [dat[0] for dat in times]
     hour_norm = [dat[1] for dat in times]
 
-    latlons = [normalize_latlon(lat, long)] * len(times)
+    latlons = [normalize_latlon(lat, lon)] * len(times)
     lat_norm = [dat[0] for dat in latlons]
     lon_norm = [dat[1] for dat in latlons]
 
@@ -216,6 +202,7 @@ def stack_to_datacube(stack: DataArray, lat: float, long: float) -> Dict[str, An
         "latlon": torch.tensor(np.hstack((lat_norm, lon_norm)), dtype=torch.float32, device=device),
         "pixels": pixels.to(device),
         "gsd": torch.tensor(stack.gsd.values, device=device),
+        # "gsd": torch.tensor([10], device=device),
         "waves": torch.tensor(waves, device=device),
     }
 
