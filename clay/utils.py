@@ -18,6 +18,40 @@ from xarray import DataArray
 from clay.args import args, device, metadata
 
 
+def shift_latitude(pixel_shift: int, gsd: int) -> float:
+    """
+    Calculate the latitude shift for a given pixel shift and GSD.
+
+    Parameters:
+    pixel_shift: Number of pixels to shift.
+    gsd: Ground Sample Distance in meters/pixel.
+
+    Returns:
+    Shift in latitude in degrees.
+    """
+    shift_meters = pixel_shift * gsd
+    latitude_shift = shift_meters / 111320
+    return latitude_shift
+
+
+def shift_longitude(lat: float, pixel_shift: int, gsd: int) -> float:
+    """
+    Calculate the longitude shift for a given pixel shift, GSD, and latitude.
+
+    Parameters:
+    lat: Latitude of the point.
+    pixel_shift: Number of pixels to shift.
+    gsd: Ground Sample Distance in meters/pixel.
+
+    Returns:
+    Shift in longitude in degrees.
+    """
+    lat_rad = math.radians(lat)
+    shift_meters = pixel_shift * gsd
+    longitude_shift = shift_meters / (111320 * math.cos(lat_rad))
+    return longitude_shift
+
+
 def posemb_sincos_2d(h, w, dim, temperature: int = 10000, dtype=torch.float32):
     y, x = torch.meshgrid(torch.arange(h), torch.arange(w), indexing="ij")
     assert (dim % 4) == 0, "feature dimension must be multiple of 4 for sincos emb"
