@@ -190,7 +190,7 @@ def get_catalog_items(
             dates.add(item.datetime.date())
 
     if not items:
-        raise ValueError("Unable to find any items at ({lat}, {lon}) from {start} to {end} with {bb_offset} offset!")
+        raise ValueError(f"Unable to find any items at ({lat}, {lon}) from {start} to {end} with {bb_offset} offset!")
 
     return items
 
