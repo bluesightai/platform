@@ -86,19 +86,19 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
     return distance
 
 
-def find_closest_point(centers: List[Tuple[float, float]], target_lat: float, target_lon: float) -> Tuple[float, float]:
-    closest_point = centers[0]
+def find_closest_point(centers: List[Tuple[float, float]], target_lat: float, target_lon: float) -> int:
+    closest_point_idx = 0
     min_distance = float("inf")
 
-    for center in centers:
+    for i, center in enumerate(centers):
         center_lat, center_lon = center
         distance = haversine_distance(center_lat, center_lon, target_lat, target_lon)
 
         if distance < min_distance:
             min_distance = distance
-            closest_point = center
+            closest_point_idx = i
 
-    return closest_point
+    return closest_point_idx
 
 
 def posemb_sincos_2d(h, w, dim, temperature: int = 10000, dtype=torch.float32):
