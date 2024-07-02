@@ -163,7 +163,7 @@ def get_catalog_items(
     max_items: int = 1,
 ) -> List[pystac.Item]:
 
-    logger.info(
+    logger.debug(
         f"Searching catalogue for {max_items} item(s) at ({lat}, {lon}) from {start} to {end} with {bb_offset} offset..."
     )
 
@@ -195,7 +195,9 @@ def get_catalog_items(
     return items
 
 
-def get_bounds(lat: float, lon: float, epsg: int, gsd: int = 10, size: int = 64) -> Bbox:
+def get_bounds(lat: float, lon: float, epsg: int, gsd: int, size: int) -> Bbox:
+
+    logger.debug(f"Calculating bounds for ({lat}, {lon}) with epsg={epsg}, gsd={gsd}, and size={size}...")
 
     # Convert point of interest into the image projection
     # (assumes all images are in the same projection)
@@ -205,7 +207,7 @@ def get_bounds(lat: float, lon: float, epsg: int, gsd: int = 10, size: int = 64)
         geometry=[Point(lon, lat)],
     ).to_crs(epsg)
 
-    if poidf is None:
+    if poidf is None or poidf.empty:
         raise ValueError("DataFrame is empty!")
 
     coords = poidf.iloc[0].geometry.coords[0]
