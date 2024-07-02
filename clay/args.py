@@ -9,8 +9,11 @@ class Args(BaseSettings):
 
     hub_repo_id: str = "made-with-clay/Clay"
     hub_filename: str = "clay-v1-base.ckpt"
-    platform: str = "sentinel-2-l2a"
-    stac_api_url: str = "https://earth-search.aws.element84.com/v1"
+    platform: str = "naip"
+    stac_api_url: str = "https://planetarycomputer.microsoft.com/api/stac/v1"
+    # platform: str = "sentinel-2-l2a"
+    # stac_api_url: str = "https://earth-search.aws.element84.com/v1"
+
     assets: List[str] = [
         "blue",
         "green",
