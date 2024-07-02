@@ -225,12 +225,12 @@ def get_encoder() -> Encoder:
     return encoder
 
 
-def get_embedding(lat: float, lon: float, start: str = "2024-01-01", end: str = "2024-05-01", size: int = 64):
-    logger.info(f"Building embedding for at ({lat}, {lon}) from {start} to {end} for {size} size!")
+def get_embedding(lat: float, lon: float, size: int, gsd: int, start: str = "2024-01-01", end: str = "2024-05-01"):
+    logger.debug(f"Building embedding for at ({lat}, {lon}) from {start} to {end} for {size} size!")
     items = get_catalog_items(lat=lat, lon=lon, start=start, end=end)
-    stack = get_stack(lat=lat, lon=lon, items=items, size=size)
+    stack = get_stack(lat=lat, lon=lon, items=items, size=size, gsd=gsd)
     datacube = stack_to_datacube(lat=lat, lon=lon, stack=stack)
-    logger.info("Running model inference...")
+    logger.debug("Running model inference...")
     with torch.no_grad():
         unmsk_patch, unmsk_idx, msk_idx, msk_matrix = encoder(datacube)
     embedding = unmsk_patch[:, 0, :].cpu().numpy()
