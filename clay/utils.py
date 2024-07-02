@@ -284,8 +284,10 @@ def get_stack(lat: float, lon: float, items: List[pystac.Item], size: int, gsd: 
     return stack
 
 
-def visualize_stack(stack):
-    stack.sel(band=["red", "green", "blue"]).plot.imshow(row="time", rgb="band", vmin=0, vmax=2000, col_wrap=6)
+def visualize_stack(stack, figsize=(40, 40)):
+    stack.sel(band=["red", "green", "blue"]).plot.imshow(
+        row="time", rgb="band", vmin=0, vmax=2000, col_wrap=6, figsize=figsize
+    )
     for ax in plt.gcf().axes:
         ax.set_aspect("equal")
     plt.show()
