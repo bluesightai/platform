@@ -174,8 +174,8 @@ def get_catalog_items(
         datetime=f"{start}/{end}",
         bbox=(lon - bb_offset, lat - bb_offset, lon + bb_offset, lat + bb_offset),
         max_items=max_items,
-        query={"eo:cloud_cover": {"lt": 5}},
-        sortby="properties.eo:cloud_cover",
+        query={"eo:cloud_cover": {"lt": 5}} if args.platform != "naip" else None,
+        sortby="properties.eo:cloud_cover" if args.platform != "naip" else None,
     )
 
     all_items = search.item_collection()
