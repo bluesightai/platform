@@ -223,25 +223,62 @@ def get_bounds(lat: float, lon: float, epsg: int, gsd: int, size: int) -> Bbox:
     return bounds
 
 
-def get_stack(lat: float, lon: float, items: List[pystac.Item], size: int = 64, gsd: int = 10) -> DataArray:
+def get_stack(lat: float, lon: float, items: List[pystac.Item], size: int, gsd: int) -> DataArray:
 
     # Extract coordinate system from first item
     epsg: int = items[0].properties["proj:epsg"]
 
     bounds = get_bounds(lat=lat, lon=lon, epsg=epsg, gsd=gsd, size=size)
 
-    stack: DataArray = stackstac.stack(
-        items,
-        bounds=bounds,
-        snap_bounds=False,
-        epsg=epsg,
-        resolution=gsd,
-        dtype=np.dtype("float32"),
-        rescale=False,
-        fill_value=0,
-        assets=args.assets,
-        resampling=Resampling.nearest,
-    )
+    logger.debug(bounds)
+
+    match args.platform:
+        case "naip":
+
+            import rioxarray
+            import xarray as xr
+
+            item = items[0]
+
+            dataset = rioxarray.open_rasterio(item.assets["image"].href).sel(band=[1, 2, 3, 4])
+            granule_name = item.assets["image"].href.split("/")[-1]
+
+            # dataset = dataset.transpose("band", "y", "x")
+            # cropped_dataset = dataset.isel(x=slice(1, -1), y=slice(1, -1))
+            tile = dataset.rio.clip_box(minx=bounds[0], miny=bounds[1], maxx=bounds[2], maxy=bounds[3])
+
+            # x_mid, y_mid = cropped_dataset.x.size // 2, cropped_dataset.y.size // 2
+            # x_start, y_start = x_mid - size // 2, x_mid - size // 2
+            # x_end, y_end = x_mid + size // 2, x_mid + size // 2
+
+            # Extract the tile from the cropped dataset
+            # tile = cropped_dataset.isel(x=slice(x_start, x_end), y=slice(y_start, y_end))
+
+            tile = tile.assign_coords(band=["red", "green", "blue", "nir"])
+            tile_save = tile
+
+            time_coord = xr.DataArray([item.properties["datetime"]], dims="time", name="time")
+            tile = tile.expand_dims(time=[0])
+            tile = tile.assign_coords(time=time_coord)
+
+            gsd_coord = xr.DataArray([gsd], dims="gsd", name="gsd")
+            tile = tile.expand_dims(gsd=[0])
+            tile = tile.assign_coords(gsd=gsd_coord)
+            tile = tile[0]  # gsd
+            stack = tile
+        case _:
+            stack: DataArray = stackstac.stack(
+                items,
+                bounds=bounds,
+                snap_bounds=False,
+                epsg=epsg,
+                resolution=gsd,
+                dtype=np.dtype("float32"),
+                rescale=False,
+                fill_value=0,
+                assets=args.assets,
+                resampling=Resampling.nearest,
+            )
     stack = stack.compute()
 
     return stack
