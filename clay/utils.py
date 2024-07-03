@@ -68,6 +68,16 @@ def get_square_centers(
     return centers
 
 
+def get_bbox(lat: float, lon: float, size: int, gsd: int) -> Bbox:
+    bounds = (
+        lat + shift_latitude(pixel_shift=int(0.5 * size), gsd=gsd),
+        lon + shift_longitude(lat=lat, pixel_shift=int(-0.5 * size), gsd=gsd),
+        lat + shift_latitude(pixel_shift=int(-0.5 * size), gsd=gsd),
+        lon + shift_longitude(lat=lat, pixel_shift=int(0.5 * size), gsd=gsd),
+    )
+    return bounds
+
+
 def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
 
