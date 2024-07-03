@@ -21,6 +21,9 @@ geopandas = "^1.0.0"
 shapely = "^2.0.4"
 kafka-python-ng = "^2.2.2"
 matplotlib = "^3.9.0"
+rioxarray = "^0.15.7"
+xarray = "^2024.6.0"
+fire = "^0.6.0"
 # malevich = {url = "https://github.com/MalevichAI/malevich/archive/dev/unstable.zip"}
 
 [tool.poetry.group.dev.dependencies]
