@@ -11,7 +11,7 @@ from vit_pytorch.simple_vit import Transformer
 
 from clay.args import args, device
 from clay.factory import DynamicEmbedding
-from clay.utils import get_catalog_items, get_stack, posemb_sincos_2d_with_gsd, stack_to_datacube, visualize_stack
+from clay.utils import get_catalog_items, get_stack, posemb_sincos_2d_with_gsd, stack_to_datacube
 
 torch.set_float32_matmul_precision("medium")
 os.environ["TORCH_CUDNN_V8_API_DISABLED"] = "1"
