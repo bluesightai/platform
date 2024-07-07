@@ -1,13 +1,16 @@
 import math
 import os
 import re
+from typing import Tuple
 
 import torch
 from einops import rearrange, repeat
 from huggingface_hub import hf_hub_download
 from loguru import logger
+from numpy._typing import NDArray
 from torch import nn
 from vit_pytorch.simple_vit import Transformer
+from xarray import DataArray
 
 from clay.config import config, device
 from clay.factory import DynamicEmbedding
