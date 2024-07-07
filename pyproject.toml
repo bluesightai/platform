@@ -23,8 +23,13 @@ kafka-python-ng = "^2.2.2"
 matplotlib = "^3.9.0"
 rioxarray = "^0.15.7"
 xarray = "^2024.6.0"
-fire = "^0.6.0"
 # malevich = {url = "https://github.com/MalevichAI/malevich/archive/dev/unstable.zip"}
+
+[tool.poetry.group.app.dependencies]
+fastapi = "^0.111.0"
+uvicorn = {extras = ["standard"], version = "^0.30.1"}
+gunicorn = "^22.0.0"
+supabase = "^2.5.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.4.2"
@@ -34,6 +39,12 @@ notebook = "6.4.12"
 jupyter = "^1.0.0"
 jupyter-contrib-nbextensions = "^0.7.0"
 jupyterlab = "^4.2.3"
+
+[tool.poetry.group.scripts.dependencies]
+fire = "^0.6.0"
+pygeohash = "^1.2.0"
+qdrant-client = "^1.10.0"
+opencv-python = "^4.10.0.84"
 
 [tool.black]
 line-length = 120
