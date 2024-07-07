@@ -225,7 +225,9 @@ def get_encoder() -> Encoder:
     return encoder
 
 
-def get_embedding(lat: float, lon: float, size: int, gsd: int, start: str = "2024-01-01", end: str = "2024-05-01"):
+def get_embedding(
+    lat: float, lon: float, size: int, gsd: float, start: str = "2024-01-01", end: str = "2024-05-01"
+) -> Tuple[NDArray, DataArray]:
     logger.debug(f"Building embedding for at ({lat}, {lon}) from {start} to {end} for {size} size!")
     items = get_catalog_items(lat=lat, lon=lon, start=start, end=end)
     stack = get_stack(lat=lat, lon=lon, items=items, size=size, gsd=gsd)

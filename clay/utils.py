@@ -205,7 +205,7 @@ def get_catalog_items(
     return items
 
 
-def get_bounds(lat: float, lon: float, epsg: int, gsd: int, size: int) -> Bbox:
+def get_bounds(lat: float, lon: float, epsg: int, gsd: float, size: int) -> Bbox:
 
     logger.debug(f"Calculating bounds for ({lat}, {lon}) with epsg={epsg}, gsd={gsd}, and size={size}...")
 
@@ -233,7 +233,7 @@ def get_bounds(lat: float, lon: float, epsg: int, gsd: int, size: int) -> Bbox:
     return bounds
 
 
-def get_stack(lat: float, lon: float, items: List[pystac.Item], size: int, gsd: int) -> DataArray:
+def get_stack(lat: float, lon: float, items: List[pystac.Item], size: int, gsd: float) -> DataArray:
 
     # Extract coordinate system from first item
     epsg: int = items[0].properties["proj:epsg"]
