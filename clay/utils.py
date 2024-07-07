@@ -224,10 +224,10 @@ def get_bounds(lat: float, lon: float, epsg: int, gsd: float, size: int) -> Bbox
 
     # Create bounds in projection
     bounds: Bbox = (
-        coords[0] - (size * gsd) // 2,
-        coords[1] - (size * gsd) // 2,
-        coords[0] + (size * gsd) // 2,
-        coords[1] + (size * gsd) // 2,
+        coords[0] - (size * gsd) / 2,
+        coords[1] - (size * gsd) / 2,
+        coords[0] + (size * gsd) / 2,
+        coords[1] + (size * gsd) / 2,
     )
 
     return bounds
@@ -254,18 +254,25 @@ def get_stack(lat: float, lon: float, items: List[pystac.Item], size: int, gsd: 
             granule_name = item.assets["image"].href.split("/")[-1]
 
             # dataset = dataset.transpose("band", "y", "x")
-            # cropped_dataset = dataset.isel(x=slice(1, -1), y=slice(1, -1))
+            # dataset = dataset.isel(x=slice(1, -1), y=slice(1, -1))
+
             tile = dataset.rio.clip_box(minx=bounds[0], miny=bounds[1], maxx=bounds[2], maxy=bounds[3])
-
-            # x_mid, y_mid = cropped_dataset.x.size // 2, cropped_dataset.y.size // 2
-            # x_start, y_start = x_mid - size // 2, x_mid - size // 2
-            # x_end, y_end = x_mid + size // 2, x_mid + size // 2
-
-            # Extract the tile from the cropped dataset
-            # tile = cropped_dataset.isel(x=slice(x_start, x_end), y=slice(y_start, y_end))
-
             tile = tile.assign_coords(band=["red", "green", "blue", "nir"])
-            tile_save = tile
+            # logger.info(tile)
+
+            current_shape = tile.shape[1:]  # (height, width)
+            if current_shape[0] > size or current_shape[1] > size:
+                logger.warning(f"Current shape {current_shape} is bigger than target shape ({size}, {size})!")
+                x_center = current_shape[1] // 2
+                y_center = current_shape[0] // 2
+                x_start = max(0, x_center - size // 2)
+                y_start = max(0, y_center - size // 2)
+                x_end = x_start + size
+                y_end = y_start + size
+                tile = tile.isel(x=slice(x_start, x_end), y=slice(y_start, y_end))
+
+            if current_shape[0] < size or current_shape[1] < size:
+                raise ValueError(f"Current shape {current_shape} is smaller than target shape ({size}, {size})!")
 
             time_coord = xr.DataArray([item.properties["datetime"]], dims="time", name="time")
             tile = tile.expand_dims(time=[0])
