@@ -16,7 +16,7 @@ from stackstac.stack import Bbox
 from torchvision.transforms import v2
 from xarray import DataArray
 
-from clay.args import args, device, metadata
+from clay.config import config, device, metadata
 
 
 def shift_latitude(pixel_shift: int, gsd: int) -> float:
@@ -178,14 +178,14 @@ def get_catalog_items(
     )
 
     # Search the catalogue
-    catalog = pystac_client.Client.open(args.stac_api_url)
+    catalog = pystac_client.Client.open(config.stac_api_url)
     search = catalog.search(
-        collections=[args.platform],
+        collections=[config.platform],
         datetime=f"{start}/{end}",
         bbox=(lon - bb_offset, lat - bb_offset, lon + bb_offset, lat + bb_offset),
         max_items=max_items,
-        query={"eo:cloud_cover": {"lt": 5}} if args.platform != "naip" else None,
-        sortby="properties.eo:cloud_cover" if args.platform != "naip" else None,
+        query={"eo:cloud_cover": {"lt": 5}} if config.platform != "naip" else None,
+        sortby="properties.eo:cloud_cover" if config.platform != "naip" else None,
     )
 
     all_items = search.item_collection()
@@ -242,7 +242,7 @@ def get_stack(lat: float, lon: float, items: List[pystac.Item], size: int, gsd: 
 
     logger.debug(bounds)
 
-    match args.platform:
+    match config.platform:
         case "naip":
 
             import rioxarray
@@ -286,7 +286,7 @@ def get_stack(lat: float, lon: float, items: List[pystac.Item], size: int, gsd: 
                 dtype=np.dtype("float32"),
                 rescale=False,
                 fill_value=0,
-                assets=args.assets,
+                assets=config.assets,
                 resampling=Resampling.nearest,
             )
     stack = stack.compute()
@@ -309,9 +309,9 @@ def stack_to_datacube(lat: float, lon: float, stack: DataArray) -> Dict[str, Any
     std = []
     waves = []
     for band in stack.band:
-        mean.append(metadata[args.platform]["bands"]["mean"][str(band.values)])
-        std.append(metadata[args.platform]["bands"]["std"][str(band.values)])
-        waves.append(metadata[args.platform]["bands"]["wavelength"][str(band.values)])
+        mean.append(metadata[config.platform]["bands"]["mean"][str(band.values)])
+        std.append(metadata[config.platform]["bands"]["std"][str(band.values)])
+        waves.append(metadata[config.platform]["bands"]["wavelength"][str(band.values)])
 
     # Prepare the normalization transform function using the mean and std values.
     transform = v2.Compose(
@@ -334,7 +334,7 @@ def stack_to_datacube(lat: float, lon: float, stack: DataArray) -> Dict[str, Any
     pixels = transform(pixels)
 
     datacube: Dict[str, Any] = {
-        "platform": args.platform,
+        "platform": config.platform,
         "time": torch.tensor(
             np.hstack((week_norm, hour_norm)),
             dtype=torch.float32,

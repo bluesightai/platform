@@ -4,7 +4,7 @@ import torch
 from pydantic_settings import BaseSettings
 
 
-class Args(BaseSettings):
+class Config(BaseSettings):
     """These values may be overriden by envs"""
 
     hub_repo_id: str = "made-with-clay/Clay"
@@ -28,7 +28,7 @@ class Args(BaseSettings):
     ]
 
 
-args = Args()
+config = Config()
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 metadata = {
     "sentinel-2-l2a": {

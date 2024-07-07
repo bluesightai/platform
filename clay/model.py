@@ -9,7 +9,7 @@ from loguru import logger
 from torch import nn
 from vit_pytorch.simple_vit import Transformer
 
-from clay.args import args, device
+from clay.config import config, device
 from clay.factory import DynamicEmbedding
 from clay.utils import get_catalog_items, get_stack, posemb_sincos_2d_with_gsd, stack_to_datacube
 
@@ -195,7 +195,7 @@ class Encoder(nn.Module):
 
 def get_encoder() -> Encoder:
 
-    ckpt_path = hf_hub_download(repo_id=args.hub_repo_id, filename=args.hub_filename)
+    ckpt_path = hf_hub_download(repo_id=config.hub_repo_id, filename=config.hub_filename)
     encoder = Encoder()
 
     ckpt = torch.load(ckpt_path, map_location=device)
