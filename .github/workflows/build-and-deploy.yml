@@ -26,10 +26,10 @@ jobs:
           tags: ghcr.io/${{ github.repository }}:latest
 
   deploy:
-    needs: build
-    runs-on: ubuntu-latest
     env:
       DOCKER_COMPOSE_PATH: '/root/clay/'
+    needs: build
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: appleboy/scp-action@v0.1.7
@@ -55,6 +55,7 @@ jobs:
             echo "IMAGE_NAME=ghcr.io/${{ github.repository }}:latest" >> .env
             echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> .env
             echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> .env
+            docker pull ghcr.io/${{ github.repository }}:latest
             docker compose up -d
             # docker pull ghcr.io/${{ github.repository }}:latest
             # docker rm -f  || true
