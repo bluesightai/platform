@@ -24,6 +24,8 @@ jobs:
         with:
           push: true
           tags: ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     env:
