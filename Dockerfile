@@ -1,5 +1,5 @@
-# FROM python:3.11
-FROM malevichai/app:python-torch_v0.1
+FROM python:3.11
+# FROM malevichai/app:python-torch_v0.1
 
 # Install poetry separated from system interpreter
 ENV POETRY_VERSION=1.8.3
@@ -13,7 +13,7 @@ RUN python3 -m venv $POETRY_VENV \
 
 # Installing only dependencies
 COPY poetry.lock pyproject.toml ./
-RUN poetry config virtualenvs.create false && poetry install --no-root --no-interaction --no-dev
+RUN poetry config virtualenvs.create false && poetry install --no-root --no-interaction
 # RUN poetry export --without-hashes -f requirements.txt --output export.txt
 # RUN pip install -r export.txt
 
@@ -25,7 +25,10 @@ hf_hub_download(repo_id='made-with-clay/Clay', filename='clay-v1-base.ckpt')"
 # Installing clay module itself
 COPY ./clay ./clay
 RUN touch README.md # required by poetry
-RUN poetry config virtualenvs.create false && poetry install --no-interaction --no-dev
+RUN poetry config virtualenvs.create false && poetry install --no-interaction
 
-COPY ./clay/malevich/bindings.py ./apps/
-# CMD [ "python", "clay/model.py" ]
+COPY ./scripts ./scripts
+COPY ./app ./app
+
+# COPY ./clay/malevich/bindings.py ./apps/
+CMD [ "gunicorn", "app.main:app", "--workers", "4", "--worker-class", "uvicorn.workers.UvicornWorker" ]
