@@ -1,15 +1,15 @@
 dependencies:
 - clay:
-    installer: image
+    installer: space
     options:
-      core_auth_token: null
-      core_auth_user: null
-      core_host: https://core.malevich.ai/
+      branch: aac326f09d5b4299ace8f9adb9ac5686
       image_auth_pass: null
       image_auth_user: null
       image_ref: furiousteabag/clay
+      reverse_id: clay
+      version: 2d9c7ae8e90748aaa603be55d39555de
     package_id: clay
-    version: ''
+    version: 0.1.0
 flows: {}
 preferences:
   log_format: RICH
