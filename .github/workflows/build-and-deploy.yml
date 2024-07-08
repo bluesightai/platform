@@ -58,8 +58,8 @@ jobs:
 
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker system prune --force
+            docker compose pull   
             docker compose stop
             docker compose rm -f
-            docker compose pull   
             docker compose up -d
             # docker rm -f  || true
