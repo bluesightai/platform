@@ -6,3 +6,4 @@ indexes/
 models/
 .cache/
 malevich.secrets.yaml
+.env
