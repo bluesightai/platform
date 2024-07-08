@@ -31,4 +31,4 @@ COPY ./scripts ./scripts
 COPY ./app ./app
 
 # COPY ./clay/malevich/bindings.py ./apps/
-CMD [ "gunicorn", "app.main:app", "--bind", "0.0.0.0:8000", "--workers", "1", "--worker-class", "app.utils.worker.ProxyUvicornWorker" ]
+CMD [ "gunicorn", "app.main:app", "--bind", "0.0.0.0:8000", "--workers", "1", "--worker-class", "uvicorn.workers.UvicornWorker" ]
