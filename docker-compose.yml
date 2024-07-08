@@ -1,0 +1,12 @@
+services:
+  clay:
+    image: ${IMAGE_NAME:-clay}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    tty: true
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    ports:
+      - "8000:8000"
