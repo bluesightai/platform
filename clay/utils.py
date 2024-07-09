@@ -1,4 +1,5 @@
 import math
+from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
 import geopandas as gpd
@@ -150,7 +151,7 @@ def posemb_sincos_1d(pos, dim, temperature: int = 10000, dtype=torch.float32):
 
 
 # Prep datetimes embedding using a normalization function from the model code.
-def normalize_timestamp(date):
+def normalize_timestamp(date: datetime):
     week = date.isocalendar().week * 2 * np.pi / 52
     hour = date.hour * 2 * np.pi / 24
 
@@ -354,4 +355,58 @@ def stack_to_datacube(lat: float, lon: float, stack: DataArray) -> Dict[str, Any
         "waves": torch.tensor(waves, device=device),
     }
 
+    return datacube
+
+
+def get_datacube(
+    platform: str,
+    pixels: List[List[List[float]]],
+    bands: List[str],
+    point: Tuple[float, float],
+    timestamp: datetime,
+    gsd: float,
+):
+
+    mean = []
+    std = []
+    waves = []
+    for band in bands:
+        mean.append(metadata[platform]["bands"]["mean"][band])
+        std.append(metadata[platform]["bands"]["std"][band])
+        waves.append(metadata[platform]["bands"]["wavelength"][band])
+
+    # Prepare the normalization transform function using the mean and std values.
+    transform = v2.Compose(
+        [
+            v2.Normalize(mean=mean, std=std),
+        ]
+    )
+
+    datetimes = [timestamp]
+    times = [normalize_timestamp(dat) for dat in datetimes]
+    week_norm = [dat[0] for dat in times]
+    hour_norm = [dat[1] for dat in times]
+
+    latlons = [normalize_latlon(point[0], point[1])] * len(times)
+    lat_norm = [dat[0] for dat in latlons]
+    lon_norm = [dat[1] for dat in latlons]
+
+    # Normalize pixels
+    pixels_numpy = np.array([pixels], dtype=np.float32)
+    pixels_torch = torch.from_numpy(pixels_numpy)
+    pixels_torch = transform(pixels_torch)
+
+    datacube: Dict[str, Any] = {
+        "platform": config.platform,
+        "time": torch.tensor(
+            np.hstack((week_norm, hour_norm)),
+            dtype=torch.float32,
+            device=device,
+        ),
+        "latlon": torch.tensor(np.hstack((lat_norm, lon_norm)), dtype=torch.float32, device=device),
+        "pixels": pixels_torch.to(device),
+        "gsd": torch.tensor(gsd, device=device),
+        # "gsd": torch.tensor([10], device=device),
+        "waves": torch.tensor(waves, device=device),
+    }
     return datacube

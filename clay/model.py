@@ -1,7 +1,8 @@
 import math
 import os
 import re
-from typing import Tuple
+from datetime import datetime
+from typing import List, Tuple
 
 import torch
 from einops import rearrange, repeat
@@ -14,7 +15,7 @@ from xarray import DataArray
 
 from clay.config import config, device
 from clay.factory import DynamicEmbedding
-from clay.utils import get_catalog_items, get_stack, posemb_sincos_2d_with_gsd, stack_to_datacube
+from clay.utils import get_catalog_items, get_datacube, get_stack, posemb_sincos_2d_with_gsd, stack_to_datacube
 
 torch.set_float32_matmul_precision("medium")
 os.environ["TORCH_CUDNN_V8_API_DISABLED"] = "1"
@@ -240,6 +241,22 @@ def get_embedding(
         unmsk_patch, unmsk_idx, msk_idx, msk_matrix = encoder(datacube)
     embedding = unmsk_patch[:, 0, :].cpu().numpy()
     return embedding, stack
+
+
+def get_embedding_img(
+    platform: str,
+    pixels: List[List[List[float]]],
+    bands: List[str],
+    point: Tuple[float, float],
+    timestamp: datetime,
+    gsd: float,
+) -> NDArray:
+    datacube = get_datacube(platform=platform, pixels=pixels, bands=bands, timestamp=timestamp, point=point, gsd=gsd)
+    logger.debug("Running model inference...")
+    with torch.no_grad():
+        unmsk_patch, unmsk_idx, msk_idx, msk_matrix = encoder(datacube)
+    embedding = unmsk_patch[:, 0, :].cpu().numpy()
+    return embedding
 
 
 encoder = get_encoder()
