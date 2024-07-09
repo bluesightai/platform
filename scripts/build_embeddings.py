@@ -63,7 +63,8 @@ def build_embeddings(
                 if len(data) >= max_items_per_file:
                     with open(f"{idx}|{base_filename}", "wb") as f:
                         pickle.dump(data, f)
-                    data, idx = [], idx + 1
+                    data.clear()
+                    idx += 1
                     logger.info(f"Exported to file: {f'{idx}|{base_filename}'}")
 
     logger.info(f"Got {len(data)} points!")
