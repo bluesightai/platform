@@ -5,7 +5,8 @@ from app.api.api import api_router
 
 
 def create_app() -> FastAPI:
-    app = FastAPI()
+    app = FastAPI(servers=[{"url": "https://api.greenlens.world/"}])
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
