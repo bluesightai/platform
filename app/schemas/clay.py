@@ -16,7 +16,9 @@ class Points(BaseModel):
 class Image(BaseModel):
     platform: str = Field(examples=list(metadata.keys()), description=f"One of {list(metadata.keys())}")
     bands: List[str] = Field(examples=[["red", "green", "blue"]])
-    gsd: float = Field(examples=[0.6], description="List of gsd's for each band in images list")
+    gsd: float = Field(
+        examples=[0.6], description="gsd's for each band in images list (should be the same across all bands)"
+    )
     point: Tuple[float, float] = Field(
         examples=[(37.77625, -122.43267), (40.68926, -74.04457)],
         description="List of 2D coordinates of points of interest",
