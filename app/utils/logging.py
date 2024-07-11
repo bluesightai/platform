@@ -66,6 +66,12 @@ class LoggingRoute(APIRoute):
                     status_code=e.status_code,
                     headers=e.headers,
                 )
+            except Exception as e:
+                logger.exception(e)
+                response = PlainTextResponse(
+                    content=json.dumps({"detail": f"{e.__class__.__name__}: {str(e)}"}).encode(),
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
             end_time = time.time()
 
             tasks = response.background
