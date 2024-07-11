@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from clay.config import metadata
 
@@ -11,6 +11,7 @@ class Points(BaseModel):
         examples=[[(37.77625, -122.43267), (40.68926, -74.04457)]],
         description="List of 2D coordinates of points of interest",
     )
+    size: int = Field(examples=[128, 64], description="Bounding box edge size in pixels. Should be dividable by 8.")
 
 
 class Image(BaseModel):
@@ -34,6 +35,12 @@ class Image(BaseModel):
         ],
         description="Lisr of 3D float arrays with dimensions [x (number of bands), h, w] representing an image",
     )
+
+    @validator("platform")
+    def check_platform_in_range(cls, value):
+        if value not in metadata:
+            raise ValueError(f"Platform must be one of {list(metadata.keys())}")
+        return value
 
 
 class Images(BaseModel):
@@ -137,3 +144,25 @@ class Embeddings(BaseModel):
     embeddings: List[List[float]] = Field(
         examples=[[[228.0, 322.1], [234.0, 231.5]]], description="Embedding representing an area"
     )
+
+
+class ClassificationLabels(BaseModel):
+    labels: List[int] = Field(
+        examples=[[0, 1, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2]], description="Classification labels. Must start with 0."
+    )
+
+
+class ModelData(BaseModel):
+    model_id: str
+
+
+class TrainClassificationData(Images, ClassificationLabels):
+    pass
+
+
+class InferClassificationData(ModelData, Images):
+    pass
+
+
+class TrainResults(ModelData):
+    train_details: Dict[str, Any] | None

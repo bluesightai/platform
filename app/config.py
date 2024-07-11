@@ -8,6 +8,7 @@ class Config(BaseSettings):
 
     SUPABASE_URL: str = os.environ.get("SUPABASE_URL") or ""
     SUPABASE_KEY: str = os.environ.get("SUPABASE_KEY") or ""
+    SUPABASE_MODEL_BUCKET: str = "models"
 
 
 config = Config()
