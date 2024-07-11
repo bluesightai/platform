@@ -2,7 +2,7 @@ import json
 import time
 from typing import Any, Callable, Dict
 
-from fastapi import HTTPException, Request, Response
+from fastapi import HTTPException, Request, Response, status
 from fastapi.responses import PlainTextResponse
 from fastapi.routing import APIRoute
 from loguru import logger
@@ -14,6 +14,18 @@ from app.utils.print import truncating_pformat
 from app.utils.requests import fetch_ip_data
 
 
+def delete_keys(d, keys=("pixels", "embeddings")):
+    if isinstance(d, dict):
+        keys_to_delete = [key for key in d if key in keys]
+        for key in keys_to_delete:
+            del d[key]
+        for value in d.values():
+            delete_keys(value)
+    elif isinstance(d, list):
+        for item in d:
+            delete_keys(item)
+
+
 # maybe async? probably no need as it runs in the background
 def log_request(request_data: Dict[str, Any]):
     # user
@@ -21,12 +33,9 @@ def log_request(request_data: Dict[str, Any]):
     request_data["body"] = json.loads(request_data["body"].decode("utf-8") or "{}")
     request_data["response"] = json.loads(request_data["response"].decode("utf-8"))
 
-    # logger.info(pformat(request_data, compact=True))
-    logger.info(truncating_pformat(request_data))
+    delete_keys(request_data)
 
-    # await asyncio.sleep(3)
-    # time.sleep(5)
-    # request_data["ip"] = "82.163.218.35"
+    logger.info(truncating_pformat(request_data))
 
     if not supabase.table("ip_data").select("*").eq("ip", request_data["ip"]).execute().data:
         logger.info(f"ip {request_data['ip']} is not present, retrieving it...")
