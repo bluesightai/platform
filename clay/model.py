@@ -4,18 +4,27 @@ import re
 from datetime import datetime
 from typing import List, Tuple
 
+import numpy as np
 import torch
 from einops import rearrange, repeat
 from huggingface_hub import hf_hub_download
 from loguru import logger
 from numpy._typing import NDArray
 from torch import nn
+from tqdm import tqdm
 from vit_pytorch.simple_vit import Transformer
 from xarray import DataArray
 
 from clay.config import config, device
 from clay.factory import DynamicEmbedding
-from clay.utils import get_catalog_items, get_datacube, get_stack, posemb_sincos_2d_with_gsd, stack_to_datacube
+from clay.utils import (
+    get_catalog_items,
+    get_datacube,
+    get_stack,
+    get_stats,
+    posemb_sincos_2d_with_gsd,
+    stack_to_datacube,
+)
 
 torch.set_float32_matmul_precision("medium")
 os.environ["TORCH_CUDNN_V8_API_DISABLED"] = "1"
@@ -256,6 +265,38 @@ def get_embedding_img(
     with torch.no_grad():
         unmsk_patch, unmsk_idx, msk_idx, msk_matrix = encoder(datacube)
     embedding = unmsk_patch[:, 0, :].cpu().numpy()
+    return embedding
+
+
+def get_embeddings_img(
+    platform: str,
+    gsd: float,
+    bands: List[str],
+    pixels: List[List[List[List[float]]]],  # [B, C, H, W]
+    points: List[Tuple[float, float]],
+    datetimes: List[datetime],
+) -> NDArray:
+
+    logger.debug(f"Running model inference on {len(points)} samples with batch size {config.batch_size}...")
+    stats = get_stats(platform=platform, bands=bands, pixels=pixels)
+
+    embeddings = []
+    for i in tqdm(range(0, len(points), config.batch_size)):
+        batch_points = points[i : i + config.batch_size]
+        batch_pixels = pixels[i : i + config.batch_size]
+        batch_datetimes = datetimes[i : i + config.batch_size]
+
+        batch_datacube = get_datacube(
+            gsd=gsd, stats=stats, pixels=batch_pixels, datetimes=batch_datetimes, points=batch_points
+        )
+
+        with torch.no_grad():
+            unmsk_patch, unmsk_idx, msk_idx, msk_matrix = encoder(batch_datacube)
+        batch_embedding = unmsk_patch[:, 0, :].cpu().numpy()
+        embeddings.append(batch_embedding)
+
+    embedding = np.concatenate(embeddings, axis=0)
+    logger.debug("Done!")
     return embedding
 
 

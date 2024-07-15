@@ -2,6 +2,7 @@ import pickle
 import secrets
 import string
 from datetime import datetime
+from typing import List, Tuple
 
 import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -21,7 +22,7 @@ from app.schemas.clay import (
 from app.schemas.common import TextResponse
 from app.utils.auth import get_current_user
 from app.utils.logging import LoggingRoute
-from clay.model import get_embedding, get_embedding_img
+from clay.model import get_embedding, get_embeddings_img
 from clay.train import predict_classification, train_classification
 
 api_router = APIRouter(route_class=LoggingRoute)
@@ -61,21 +62,38 @@ async def get_embeddings_with_coordinates(points: Points) -> Embeddings:
 @api_router.post("/embeddings/img", tags=["Embeddings"])
 async def get_embeddings_with_images(images: Images) -> Embeddings:
     """Get embeddings for a list of images."""
-    return Embeddings(
-        embeddings=[
-            get_embedding_img(
-                platform=image.platform,
-                pixels=image.pixels,
-                bands=image.bands,
-                point=image.point,
-                timestamp=datetime.fromtimestamp(image.timestamp),
-                gsd=image.gsd,
-            )
-            .squeeze()
-            .tolist()
-            for image in images.images
-        ]
-    )
+    pixels: List[List[List[List[float]]]] = []
+    points: List[Tuple[float, float]] = []
+    datetimes: List[datetime] = []
+    # Check consistency of platform, gsd, and bands
+    first_image = images.images[0]
+    platform, gsd, bands = first_image.platform, first_image.gsd, first_image.bands
+    pixel_shape = None
+    for image in images.images:
+        if image.platform != platform:
+            raise ValueError("Inconsistent platform across images")
+        if image.gsd != gsd:
+            raise ValueError("Inconsistent gsd across images")
+        if image.bands != bands:
+            raise ValueError("Inconsistent bands across images")
+
+        if pixel_shape is None:
+            pixel_shape = len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])
+        elif (len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])) != pixel_shape:
+            raise ValueError("Inconsistent pixel shapes across images")
+
+        pixels.append(image.pixels)
+        points.append(image.point)
+        datetimes.append(datetime.fromtimestamp(image.timestamp))
+    embeddings = get_embeddings_img(
+        platform=images.images[0].platform,
+        gsd=images.images[0].gsd,
+        bands=images.images[0].bands,
+        pixels=pixels,
+        points=points,
+        datetimes=datetimes,
+    ).tolist()
+    return Embeddings(embeddings=embeddings)
 
 
 @api_router.post("/auth/register", tags=["Authentication"])

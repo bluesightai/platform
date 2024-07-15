@@ -1,6 +1,6 @@
 import math
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, TypedDict
 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -358,41 +358,60 @@ def stack_to_datacube(lat: float, lon: float, stack: DataArray) -> Dict[str, Any
     return datacube
 
 
-def get_datacube(
-    platform: str,
-    pixels: List[List[List[float]]],
-    bands: List[str],
-    point: Tuple[float, float],
-    timestamp: datetime,
-    gsd: float,
-):
+class Stats(TypedDict):
+    mean: List[float]
+    std: List[float]
+    waves: List[float]
 
-    mean = []
-    std = []
-    waves = []
-    for band in bands:
-        mean.append(metadata[platform]["bands"]["mean"][band])
-        std.append(metadata[platform]["bands"]["std"][band])
-        waves.append(metadata[platform]["bands"]["wavelength"][band])
+
+def get_stats(platform: str, bands: List[str], pixels: List[List[List[List[float]]]]) -> Stats:
+    mean: List[float] = []
+    std: List[float] = []
+    waves: List[float] = []
+
+    wavelengths = {"red": 0.65, "green": 0.56, "blue": 0.48, "nir": 0.842}
+
+    if platform in metadata:
+        for band in bands:
+            mean.append(metadata[platform]["bands"]["mean"][band])
+            std.append(metadata[platform]["bands"]["std"][band])
+            waves.append(metadata[platform]["bands"]["wavelength"][band])
+    elif platform == "other":
+        pixels_array = np.array(pixels)
+        for i, band in enumerate(bands):
+            band_data = pixels_array[:, i, :, :].flatten()
+            mean.append(float(np.mean(band_data)))
+            std.append(float(np.std(band_data)))
+            waves.append(wavelengths.get(band, 0.0))
+
+    return Stats(mean=mean, std=std, waves=waves)
+
+
+def get_datacube(
+    gsd: float,
+    stats: Stats,
+    pixels: List[List[List[List[float]]]],
+    points: List[Tuple[float, float]],
+    datetimes: List[datetime],
+):
 
     # Prepare the normalization transform function using the mean and std values.
     transform = v2.Compose(
         [
-            v2.Normalize(mean=mean, std=std),
+            v2.Normalize(mean=stats["mean"], std=stats["std"]),
         ]
     )
 
-    datetimes = [timestamp]
     times = [normalize_timestamp(dat) for dat in datetimes]
     week_norm = [dat[0] for dat in times]
     hour_norm = [dat[1] for dat in times]
 
-    latlons = [normalize_latlon(point[0], point[1])] * len(times)
+    latlons = [normalize_latlon(lat, lon) for lat, lon in points]
     lat_norm = [dat[0] for dat in latlons]
     lon_norm = [dat[1] for dat in latlons]
 
     # Normalize pixels
-    pixels_numpy = np.array([pixels], dtype=np.float32)
+    pixels_numpy = np.array(pixels, dtype=np.float32)
     pixels_torch = torch.from_numpy(pixels_numpy)
     pixels_torch = transform(pixels_torch)
 
@@ -407,6 +426,6 @@ def get_datacube(
         "pixels": pixels_torch.to(device),
         "gsd": torch.tensor(gsd, device=device),
         # "gsd": torch.tensor([10], device=device),
-        "waves": torch.tensor(waves, device=device),
+        "waves": torch.tensor(stats["waves"], device=device),
     }
     return datacube
