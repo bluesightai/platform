@@ -1,6 +1,7 @@
 from typing import List
 
 import torch
+from loguru import logger
 from pydantic_settings import BaseSettings
 
 
@@ -31,6 +32,7 @@ class Config(BaseSettings):
 
 config = Config()
 device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+logger.info(device)
 metadata = {
     "sentinel-2-l2a": {
         "band_order": ["blue", "green", "red", "rededge1", "rededge2", "rededge3", "nir", "nir08", "swir16", "swir22"],
