@@ -7,8 +7,8 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
-torch = {version = "2.3.1", source = "pytorch-cpu"}
-torchvision = {version = "0.18.1", source = "pytorch-cpu"}
+torch = "2.3.1"
+torchvision = "0.18.1"
 einops = "0.7.0"
 vit-pytorch = "1.6.4"
 transformers = "^4.42.2"
@@ -56,8 +56,3 @@ line_length = 120
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
-
-[[tool.poetry.source]]
-name = "pytorch-cpu"
-url = "https://download.pytorch.org/whl/cpu"
-priority = "explicit"

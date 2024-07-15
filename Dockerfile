@@ -1,5 +1,6 @@
-FROM python:3.11
+# FROM python:3.11
 # FROM malevichai/app:python-torch_v0.1
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
 
 # Install poetry separated from system interpreter
 ENV POETRY_VERSION=1.8.3
