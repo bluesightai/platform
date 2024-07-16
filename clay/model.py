@@ -252,22 +252,6 @@ def get_embedding(
     return embedding, stack
 
 
-def get_embedding_img(
-    platform: str,
-    pixels: List[List[List[float]]],
-    bands: List[str],
-    point: Tuple[float, float],
-    timestamp: datetime,
-    gsd: float,
-) -> NDArray:
-    datacube = get_datacube(platform=platform, pixels=pixels, bands=bands, timestamp=timestamp, point=point, gsd=gsd)
-    logger.debug("Running model inference...")
-    with torch.no_grad():
-        unmsk_patch, unmsk_idx, msk_idx, msk_matrix = encoder(datacube)
-    embedding = unmsk_patch[:, 0, :].cpu().numpy()
-    return embedding
-
-
 def get_embeddings_img(
     platform: str,
     gsd: float,
