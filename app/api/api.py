@@ -22,7 +22,7 @@ from app.schemas.clay import (
 from app.schemas.common import TextResponse
 from app.utils.auth import get_current_user
 from app.utils.logging import LoggingRoute
-from clay.model import get_embedding, get_embeddings_img
+from clay.model import get_embeddings_img
 from clay.train import predict_classification, train_classification
 
 api_router = APIRouter(route_class=LoggingRoute)
@@ -39,24 +39,13 @@ async def train_classification_model(data: TrainClassificationData) -> TrainResu
     return TrainResults(model_id=model_name, train_details=details)
 
 
-@api_router.post("/inference/classification", tags=["Inference"])
+@api_router.post("/inference/classification", tags=["Train"])
 async def infer_classification_model(data: InferClassificationData) -> ClassificationLabels:
     """Run inference of previously trained classification model on your data."""
     embeddings = await get_embeddings_with_images(data)
     model = pickle.loads(supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).download(path=data.model_id + ".pkl"))
     labels = predict_classification(clf=model, embeddings=np.array(embeddings.embeddings))
     return ClassificationLabels(labels=labels.tolist())
-
-
-@api_router.post("/embeddings/loc", tags=["Embeddings"])
-async def get_embeddings_with_coordinates(points: Points) -> Embeddings:
-    """Get embeddings for a list of points."""
-    return Embeddings(
-        embeddings=[
-            get_embedding(lat=lat, lon=lon, size=points.size, gsd=0.6, start="2022-01-01")[0].squeeze().tolist()
-            for lat, lon in points.points
-        ]
-    )
 
 
 @api_router.post("/embeddings/img", tags=["Embeddings"])
@@ -96,7 +85,18 @@ async def get_embeddings_with_images(images: Images) -> Embeddings:
     return Embeddings(embeddings=embeddings)
 
 
-@api_router.post("/auth/register", tags=["Authentication"])
+# @api_router.post("/embeddings/loc", tags=["Embeddings"])
+# async def get_embeddings_with_coordinates(points: Points) -> Embeddings:
+#     """Get embeddings for a list of points."""
+#     return Embeddings(
+#         embeddings=[
+#             get_embedding(lat=lat, lon=lon, size=points.size, gsd=0.6, start="2022-01-01")[0].squeeze().tolist()
+#             for lat, lon in points.points
+#         ]
+#     )
+
+
+@api_router.post("/auth/register", tags=["Authentication"], include_in_schema=False)
 async def register(user_data: UserData) -> TextResponse:
     """Login endpoint
 
@@ -115,7 +115,7 @@ async def register(user_data: UserData) -> TextResponse:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@api_router.get("/auth/token", response_model=Token, tags=["Authentication"])
+@api_router.get("/auth/token", response_model=Token, tags=["Authentication"], include_in_schema=False)
 async def get_token(login_data: LoginData) -> Token:
     try:
         response = supabase.auth.sign_in_with_password({"email": login_data.email, "password": login_data.password})
@@ -127,7 +127,7 @@ async def get_token(login_data: LoginData) -> Token:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@api_router.get("/auth/me", tags=["Authentication"])
+@api_router.get("/auth/me", tags=["Authentication"], include_in_schema=False)
 async def get_my_data(current_user: UserResponse = Depends(get_current_user)):
     return current_user
 
