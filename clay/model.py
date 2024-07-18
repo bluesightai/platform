@@ -2,7 +2,7 @@ import math
 import os
 import re
 from datetime import datetime
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -258,6 +258,15 @@ def get_embeddings_img(
 
     embedding = np.concatenate(embeddings, axis=0)
     logger.debug("Done!")
+    return embedding
+
+
+def get_embedding(datacube: Dict[str, Any]) -> NDArray:
+
+    with torch.no_grad():
+        unmsk_patch, unmsk_idx, msk_idx, msk_matrix = encoder(datacube)
+    embedding = unmsk_patch[:, 0, :].cpu().numpy().squeeze()
+    logger.info(embedding.shape)
     return embedding
 
 

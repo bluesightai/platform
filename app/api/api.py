@@ -24,8 +24,9 @@ from app.schemas.clay import (
 from app.schemas.common import TextResponse
 from app.utils.auth import get_current_user
 from app.utils.logging import LoggingRoute
-from clay.model import get_embeddings_img
+from clay.model import get_embedding, get_embeddings_img
 from clay.train import predict_classification, train_classification
+from clay.utils import get_catalog_items, get_stack, stack_to_datacube
 
 api_router = APIRouter(route_class=LoggingRoute)
 
@@ -89,15 +90,16 @@ async def get_embeddings_with_images(images: Images) -> Embeddings:
     return Embeddings(embeddings=embeddings)
 
 
-# @api_router.post("/embeddings/loc", tags=["Embeddings"])
-# async def get_embeddings_with_coordinates(points: Points) -> Embeddings:
-#     """Get embeddings for a list of points."""
-#     return Embeddings(
-#         embeddings=[
-#             get_embedding(lat=lat, lon=lon, size=points.size, gsd=0.6, start="2022-01-01")[0].squeeze().tolist()
-#             for lat, lon in points.points
-#         ]
-#     )
+@api_router.post("/embeddings/loc", tags=["Embeddings"])
+async def get_embeddings_with_coordinates(points: Points) -> Embeddings:
+    """Get embeddings for a list of points."""
+    items = [get_catalog_items(lat=lat, lon=lon, start="2022-01-01") for lat, lon in points.points]
+    stacks = [
+        get_stack(lat=lat, lon=lon, items=item, size=points.size, gsd=0.6)
+        for item, (lat, lon) in zip(items, points.points)
+    ]
+    datacubes = [stack_to_datacube(lat=lat, lon=lon, stack=stack) for stack, (lat, lon) in zip(stacks, points.points)]
+    return Embeddings(embeddings=[get_embedding(datacube=datacube).tolist() for datacube in datacubes])
 
 
 @api_router.post("/auth/register", tags=["Authentication"], include_in_schema=False)
