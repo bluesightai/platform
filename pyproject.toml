@@ -24,6 +24,9 @@ rioxarray = "^0.15.7"
 xarray = "^2024.6.0"
 scikit-learn = "^1.5.1"
 xgboost = "^2.1.0"
+lightning = "^2.3.3"
+segmentation-models-pytorch = "^0.3.3"
+wandb = "^0.17.4"
 # malevich = {url = "https://github.com/MalevichAI/malevich/archive/dev/unstable.zip"}
 
 [tool.poetry.group.app.dependencies]
