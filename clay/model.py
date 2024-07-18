@@ -174,20 +174,10 @@ class Encoder(nn.Module):
 
         patches, waves_encoded = self.to_patch_embed(cube, waves)  # [B L D] - patchify & create embeddings per patch
 
-        patches = self.add_encodings(
-            patches,
-            time,
-            latlon,
-            gsd,
-        )  # [B L D] - add position encoding to the embeddings
+        patches = self.add_encodings(patches, time, latlon, gsd)  # [B L D] - add position encoding to the embeddings
 
         # mask out patches
-        (
-            unmasked_patches,
-            unmasked_indices,
-            masked_indices,
-            masked_matrix,
-        ) = self.mask_out(
+        (unmasked_patches, unmasked_indices, masked_indices, masked_matrix) = self.mask_out(
             patches
         )  # [B L:(1 - mask_ratio) D], [(1-mask_ratio)], [mask_ratio], [B L]
 
@@ -238,20 +228,6 @@ def get_encoder() -> Encoder:
     return encoder
 
 
-def get_embedding(
-    lat: float, lon: float, size: int, gsd: float, start: str = "2024-01-01", end: str = "2024-05-01"
-) -> Tuple[NDArray, DataArray]:
-    logger.debug(f"Building embedding for at ({lat}, {lon}) from {start} to {end} for {size} size!")
-    items = get_catalog_items(lat=lat, lon=lon, start=start, end=end)
-    stack = get_stack(lat=lat, lon=lon, items=items, size=size, gsd=gsd)
-    datacube = stack_to_datacube(lat=lat, lon=lon, stack=stack)
-    logger.debug("Running model inference...")
-    with torch.no_grad():
-        unmsk_patch, unmsk_idx, msk_idx, msk_matrix = encoder(datacube)
-    embedding = unmsk_patch[:, 0, :].cpu().numpy()
-    return embedding, stack
-
-
 def get_embeddings_img(
     platform: str,
     gsd: float,
@@ -285,10 +261,3 @@ def get_embeddings_img(
 
 
 encoder = get_encoder()
-
-if __name__ == "__main__":
-
-    lat, lon = 51.555997989240666, -0.2800146693353107
-    start_date, end_date = "2024-01-01", "2024-05-01"
-    embedding, stack = get_embedding(lat=lat, lon=lon, start=start_date, end=end_date, size=64)
-    logger.info(embedding.shape)
