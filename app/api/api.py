@@ -52,8 +52,8 @@ async def infer_classification_model(data: InferClassificationData) -> Classific
 async def get_embeddings_with_images(images: Images) -> Embeddings:
     """Get embeddings for a list of images."""
     pixels: List[List[List[List[float]]]] = []
-    points: List[Tuple[float, float]] = []
-    datetimes: List[datetime] = []
+    points: List[Tuple[float, float] | None] = []
+    datetimes: List[datetime | None] = []
     # Check consistency of platform, gsd, and bands
     first_image = images.images[0]
     platform, gsd, bands = first_image.platform, first_image.gsd, first_image.bands
@@ -73,7 +73,7 @@ async def get_embeddings_with_images(images: Images) -> Embeddings:
 
         pixels.append(image.pixels)
         points.append(image.point)
-        datetimes.append(datetime.fromtimestamp(image.timestamp))
+        datetimes.append(datetime.fromtimestamp(image.timestamp) if image.timestamp else None)
     embeddings = get_embeddings_img(
         platform=images.images[0].platform,
         gsd=images.images[0].gsd,

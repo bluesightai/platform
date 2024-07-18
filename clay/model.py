@@ -229,16 +229,16 @@ def get_encoder() -> Encoder:
 
 
 def get_embeddings_img(
-    platform: str,
     gsd: float,
     bands: List[str],
     pixels: List[List[List[List[float]]]],  # [B, C, H, W]
-    points: List[Tuple[float, float]],
-    datetimes: List[datetime],
+    platform: str | None,
+    points: List[Tuple[float, float] | None],
+    datetimes: List[datetime | None],
 ) -> NDArray:
 
     logger.debug(f"Running model inference on {len(points)} samples with batch size {config.batch_size}...")
-    stats = get_stats(platform=platform, bands=bands, pixels=pixels)
+    stats = get_stats(bands=bands, pixels=pixels, platform=platform)
 
     embeddings = []
     for i in tqdm(range(0, len(points), config.batch_size)):

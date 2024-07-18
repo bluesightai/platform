@@ -15,18 +15,10 @@ class Points(BaseModel):
 
 
 class Image(BaseModel):
-    platform: str = Field(
-        examples=list(metadata.keys()) + ["other"], description=f"One of {list(metadata.keys()) + ['other']}"
+    gsd: float = Field(
+        examples=[0.6], description="gsd's of each band in images list (should be the same across all bands)"
     )
     bands: List[str] = Field(examples=[["red", "green", "blue"]])
-    gsd: float = Field(
-        examples=[0.6], description="gsd's for each band in images list (should be the same across all bands)"
-    )
-    point: Tuple[float, float] = Field(
-        examples=[(37.77625, -122.43267), (40.68926, -74.04457)],
-        description="List of 2D coordinates of points of interest",
-    )
-    timestamp: int = Field(examples=[1714423534, 1614422534])
     pixels: List[List[List[float]]] = Field(
         examples=[
             [
@@ -35,13 +27,28 @@ class Image(BaseModel):
                 [[0.0, 0.0], [255.0, 255.0]],
             ]
         ],
-        description="Lisr of 3D float arrays with dimensions [x (number of bands), h, w] representing an image",
+        description="3D float array (number of bands, h, w) representing an image",
+    )
+    platform: str | None = Field(
+        default=None,
+        examples=list(metadata.keys()),
+        description=f"One of {list(metadata.keys())}. Used to retrieve means, stds and wavelengths across bands. If not provided, means and stds will be calculated from list of images, and default wavelengths will be used",
+    )
+    point: Tuple[float, float] | None = Field(
+        default=None,
+        examples=[(37.77625, -122.43267), (40.68926, -74.04457)],
+        description="(lat, lon) coordinate of the center of an image. Doesn't have a huge impact on model output.",
+    )
+    timestamp: int | None = Field(
+        default=None,
+        examples=[1714423534, 1614422534],
+        description="Timestamp when image was taken. Doesn't have a huge impact on model output.",
     )
 
     @validator("platform")
     def check_platform_in_range(cls, value):
-        if value not in list(metadata.keys()) + ["other"]:
-            raise ValueError(f"Platform must be one of {list(metadata.keys()) + ['other']}")
+        if value is not None and value not in list(metadata.keys()):
+            raise ValueError(f"Platform must be one of {list(metadata.keys())}")
         return value
 
 

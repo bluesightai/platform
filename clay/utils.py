@@ -146,6 +146,7 @@ def posemb_sincos_1d(pos, dim, temperature: int = 10000, dtype=torch.float32):
     omega = torch.arange(dim // 2) / (dim // 2 - 1)
     omega = 1.0 / (temperature**omega)
     omega = omega.to(device)
+    pos = pos.to(device)
 
     scaled_pos = pos[:, None] * omega[None, :]
     pe = torch.cat((scaled_pos.sin(), scaled_pos.cos()), dim=1)
@@ -367,19 +368,19 @@ class Stats(TypedDict):
     waves: List[float]
 
 
-def get_stats(platform: str, bands: List[str], pixels: List[List[List[List[float]]]]) -> Stats:
+def get_stats(bands: List[str], pixels: List[List[List[List[float]]]], platform: str | None) -> Stats:
     mean: List[float] = []
     std: List[float] = []
     waves: List[float] = []
 
     wavelengths = {"red": 0.65, "green": 0.56, "blue": 0.48, "nir": 0.842}
 
-    if platform in metadata:
+    if platform:
         for band in bands:
             mean.append(metadata[platform]["bands"]["mean"][band])
             std.append(metadata[platform]["bands"]["std"][band])
             waves.append(metadata[platform]["bands"]["wavelength"][band])
-    elif platform == "other":
+    else:
         pixels_array = np.array(pixels)
         for i, band in enumerate(bands):
             band_data = pixels_array[:, i, :, :].flatten()
@@ -394,8 +395,8 @@ def get_datacube(
     gsd: float,
     stats: Stats,
     pixels: List[List[List[List[float]]]],
-    points: List[Tuple[float, float]],
-    datetimes: List[datetime],
+    points: List[Tuple[float, float] | None],
+    datetimes: List[datetime | None],
 ):
 
     # Prepare the normalization transform function using the mean and std values.
@@ -405,13 +406,24 @@ def get_datacube(
         ]
     )
 
-    times = [normalize_timestamp(dat) for dat in datetimes]
-    week_norm = [dat[0] for dat in times]
-    hour_norm = [dat[1] for dat in times]
+    times = []
+    for date in datetimes:
+        if date is None:
+            times.append(torch.zeros(4, dtype=torch.float32, device=device))
+        else:
+            normalized = normalize_timestamp(date)
+            times.append(torch.tensor(np.hstack((normalized[0], normalized[1])), dtype=torch.float32, device=device))
+    time = torch.stack(times)
 
-    latlons = [normalize_latlon(lat, lon) for lat, lon in points]
-    lat_norm = [dat[0] for dat in latlons]
-    lon_norm = [dat[1] for dat in latlons]
+    latlons = []
+    for point in points:
+        if point is None or None in point:
+            latlons.append(torch.zeros(4, dtype=torch.float32, device=device))
+        else:
+            lat, lon = point
+            normalized = normalize_latlon(lat, lon)
+            latlons.append(torch.tensor(np.hstack((normalized[0], normalized[1])), dtype=torch.float32, device=device))
+    latlon = torch.stack(latlons)
 
     # Normalize pixels
     pixels_numpy = np.array(pixels, dtype=np.float32)
@@ -420,12 +432,8 @@ def get_datacube(
 
     datacube: Dict[str, Any] = {
         "platform": config.platform,
-        "time": torch.tensor(
-            np.hstack((week_norm, hour_norm)),
-            dtype=torch.float32,
-            device=device,
-        ),
-        "latlon": torch.tensor(np.hstack((lat_norm, lon_norm)), dtype=torch.float32, device=device),
+        "time": time,
+        "latlon": latlon,
         "pixels": pixels_torch.to(device),
         "gsd": torch.tensor(gsd, device=device),
         # "gsd": torch.tensor([10], device=device),
