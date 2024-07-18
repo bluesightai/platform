@@ -202,9 +202,13 @@ class Embeddings(BaseModel):
     )
 
 
-class ClassificationLabels(BaseModel):
-    labels: List[int] = Field(
-        examples=[[0, 1, 0, 1, 1, 1, 1, 2, 2, 2, 2, 2]], description="Classification labels. Must start with 0."
+class SegmentationLabels(BaseModel):
+    labels: List[List[int]] = Field(
+        examples=[
+            [[0, 1], [0, 0]],
+            [[1, 1], [1, 0]],
+        ],
+        description="2D (h, w) label array",
     )
 
 
