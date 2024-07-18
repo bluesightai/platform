@@ -1,4 +1,4 @@
-from typing import List
+from typing import Dict, List
 
 import torch
 from loguru import logger
@@ -155,3 +155,4 @@ metadata = {
         },
     },
 }
+default_wavelengths: Dict[str, float] = metadata["sentinel-2-l2a"]["bands"]["wavelength"]

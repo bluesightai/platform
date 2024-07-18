@@ -17,7 +17,7 @@ from stackstac.stack import Bbox
 from torchvision.transforms import v2
 from xarray import DataArray
 
-from clay.config import config, device, metadata
+from clay.config import config, default_wavelengths, device, metadata
 
 
 def shift_latitude(pixel_shift: int, gsd: int) -> float:
@@ -368,12 +368,12 @@ class Stats(TypedDict):
     waves: List[float]
 
 
-def get_stats(bands: List[str], pixels: List[List[List[List[float]]]], platform: str | None) -> Stats:
+def get_stats(
+    bands: List[str], pixels: List[List[List[List[float]]]], platform: str | None, wavelengths: List[float] | None
+) -> Stats:
     mean: List[float] = []
     std: List[float] = []
     waves: List[float] = []
-
-    wavelengths = {"red": 0.65, "green": 0.56, "blue": 0.48, "nir": 0.842}
 
     if platform:
         for band in bands:
@@ -381,12 +381,13 @@ def get_stats(bands: List[str], pixels: List[List[List[List[float]]]], platform:
             std.append(metadata[platform]["bands"]["std"][band])
             waves.append(metadata[platform]["bands"]["wavelength"][band])
     else:
+        wavelengths_final = dict(zip(bands, wavelengths)) if wavelengths else default_wavelengths
         pixels_array = np.array(pixels)
         for i, band in enumerate(bands):
             band_data = pixels_array[:, i, :, :].flatten()
             mean.append(float(np.mean(band_data)))
             std.append(float(np.std(band_data)))
-            waves.append(wavelengths.get(band, 0.0))
+            waves.append(wavelengths_final.get(band, 0.0))
 
     return Stats(mean=mean, std=std, waves=waves)
 

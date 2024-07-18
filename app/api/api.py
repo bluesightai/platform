@@ -74,11 +74,13 @@ async def get_embeddings_with_images(images: Images) -> Embeddings:
         pixels.append(image.pixels)
         points.append(image.point)
         datetimes.append(datetime.fromtimestamp(image.timestamp) if image.timestamp else None)
+
     embeddings = get_embeddings_img(
-        platform=images.images[0].platform,
         gsd=images.images[0].gsd,
         bands=images.images[0].bands,
         pixels=pixels,
+        platform=images.images[0].platform,
+        wavelengths=images.images[0].wavelengths,
         points=points,
         datetimes=datetimes,
     ).tolist()

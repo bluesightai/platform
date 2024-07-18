@@ -233,12 +233,13 @@ def get_embeddings_img(
     bands: List[str],
     pixels: List[List[List[List[float]]]],  # [B, C, H, W]
     platform: str | None,
+    wavelengths: List[float] | None,
     points: List[Tuple[float, float] | None],
     datetimes: List[datetime | None],
 ) -> NDArray:
 
     logger.debug(f"Running model inference on {len(points)} samples with batch size {config.batch_size}...")
-    stats = get_stats(bands=bands, pixels=pixels, platform=platform)
+    stats = get_stats(bands=bands, pixels=pixels, platform=platform, wavelengths=wavelengths)
 
     embeddings = []
     for i in tqdm(range(0, len(points), config.batch_size)):
