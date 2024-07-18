@@ -1,6 +1,6 @@
 # Foundational model platform
 
-[![Build, push to registry and deploy](https://github.com/greenlensai/clay/actions/workflows/build-and-deploy.yml/badge.svg)](https://github.com/greenlensai/clay/actions/workflows/build-and-deploy.yml)
+[![Build, push to registry and deploy](https://github.com/bluesightai/clay/actions/workflows/build-and-deploy.yml/badge.svg)](https://github.com/bluesightai/clay/actions/workflows/build-and-deploy.yml)
 
 ## ToDO
 
