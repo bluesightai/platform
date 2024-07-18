@@ -208,8 +208,15 @@ class ClassificationLabels(BaseModel):
     )
 
 
+class ClassificationLabels(BaseModel):
+    labels: List[int] = Field(examples=[[0, 1]], description="Classification labels. Must start with 0.")
+
+
 class ModelData(BaseModel):
-    model_id: str
+    model_id: str = Field(
+        examples=["classification_3200_5dtYh"],
+        description="Model to use. Get this value from according `/train` endpoint.",
+    )
 
 
 class TrainClassificationData(Images, ClassificationLabels):
