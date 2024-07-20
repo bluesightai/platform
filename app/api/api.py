@@ -51,6 +51,24 @@ async def infer_classification_model(data: InferenceData) -> ClassificationLabel
     return ClassificationLabels(labels=labels.tolist())
 
 
+@api_router.post("/train/segmentation", tags=["Train"])
+async def train_segmentation_model(data: TrainSegmentationData) -> TrainResults:
+    """Train segmentation model on your data."""
+    # model_bytes = pickle.dumps(model)
+    # model_name = f"segmentation_{len(embeddings.embeddings)}_{''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(5))}"
+    # response = supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).upload(path=model_name + ".pkl", file=model_bytes)
+    return TrainResults(model_id="123", train_details=None)
+
+
+@api_router.post("/inference/segmentation", tags=["Train"])
+async def infer_segmentation_model(data: InferenceData) -> SegmentationLabels:
+    """Run inference of previously trained segmentation model on your data."""
+    # embeddings = await get_embeddings_with_images(data)
+    # model = pickle.loads(supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).download(path=data.model_id + ".pkl"))
+    # labels = predict_classification(clf=model, embeddings=np.array(embeddings.embeddings))
+    return SegmentationLabels(labels=[])
+
+
 @api_router.post("/embeddings/img", tags=["Embeddings"])
 async def get_embeddings_with_images(images: Images) -> Embeddings:
     """Get embeddings for a list of images."""
