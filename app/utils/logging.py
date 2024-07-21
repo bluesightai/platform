@@ -14,7 +14,7 @@ from app.utils.print import truncating_pformat
 from app.utils.requests import fetch_ip_data
 
 
-def delete_keys(d, keys=("pixels", "embeddings")):
+def delete_keys(d, keys=("pixels", "embeddings", "labels")):
     if isinstance(d, dict):
         keys_to_delete = [key for key in d if key in keys]
         for key in keys_to_delete:
