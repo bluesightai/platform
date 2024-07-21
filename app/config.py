@@ -2,7 +2,7 @@ import os
 
 from pydantic_settings import BaseSettings
 from supabase import AClient, Client, create_client
-
+from supabase.client import ClientOptions
 
 class Config(BaseSettings):
 
@@ -13,4 +13,7 @@ class Config(BaseSettings):
 
 config = Config()
 
-supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY)
+supabase: Client = create_client(config.SUPABASE_URL, config.SUPABASE_KEY, options=ClientOptions(
+    postgrest_client_timeout=999999999,
+    storage_client_timeout=999999999
+  ))

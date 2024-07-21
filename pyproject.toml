@@ -28,6 +28,13 @@ lightning = "^2.3.3"
 segmentation-models-pytorch = "^0.3.3"
 wandb = "^0.17.4"
 # malevich = {url = "https://github.com/MalevichAI/malevich/archive/dev/unstable.zip"}
+pandas = "^2.2.2"
+fastparquet = "^2024.5.0"
+pyarrow = "^17.0.0"
+ratelimit = "^2.2.1"
+tenacity = "^8.5.0"
+psycopg2-binary = "^2.9.9"
+psycopg = "^3.2.1"
 
 [tool.poetry.group.app.dependencies]
 fastapi = "^0.111.0"
