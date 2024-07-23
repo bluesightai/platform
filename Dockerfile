@@ -30,8 +30,8 @@ hf_hub_download(repo_id='made-with-clay/Clay', filename='clay-v1-base.ckpt')"
 COPY ./clay ./clay
 RUN touch README.md # required by poetry
 RUN poetry config virtualenvs.create false && poetry install --no-interaction --without torch
-
-RUN pip install https://github.com/MalevichAI/malevich/archive/dev/unstable.zip
+RUN echo "test"
+RUN pip install https://github.com/MalevichAI/malevich/archive/dev/stable.zip
 RUN conda install git
 RUN malevich init
 COPY ./malevich.yaml ./malevich.yaml
@@ -41,4 +41,4 @@ COPY ./scripts ./scripts
 COPY ./app ./app
 
 # COPY ./clay/malevich/bindings.py ./apps/
-CMD [ "gunicorn", "app.main:app", "--bind", "0.0.0.0:8000", "--worker-class", "app.utils.worker.ProxyUvicornWorker", "--timeout", "1800" ]
+CMD [ "gunicorn", "app.main:app", "--bind", "0.0.0.0:8000", "--workers", "2", "--worker-class", "app.utils.worker.ProxyUvicornWorker", "--timeout", "1800" ]
