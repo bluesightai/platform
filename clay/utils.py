@@ -396,6 +396,8 @@ def get_datacube(
     pixels: List[List[List[List[float]]]],
     points: List[Tuple[float, float]],
     datetimes: List[datetime],
+    platform: str | None = None,
+    **kwargs,
 ):
 
     # Prepare the normalization transform function using the mean and std values.
@@ -417,9 +419,8 @@ def get_datacube(
     pixels_numpy = np.array(pixels, dtype=np.float32)
     pixels_torch = torch.from_numpy(pixels_numpy)
     pixels_torch = transform(pixels_torch)
-
     datacube: Dict[str, Any] = {
-        "platform": config.platform,
+        "platform": platform or config.platform,
         "time": torch.tensor(
             np.hstack((week_norm, hour_norm)),
             dtype=torch.float32,

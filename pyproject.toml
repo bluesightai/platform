@@ -5,13 +5,10 @@ description = ""
 authors = ["Alexander Smirnov <alex@asmirnov.xyz>"]
 readme = "README.md"
 
+
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
-torch = "2.3.1"
-torchvision = "0.18.1"
 einops = "0.7.0"
-vit-pytorch = "1.6.4"
-transformers = "^4.42.2"
 loguru = "^0.7.2"
 pydantic-settings = "^2.3.4"
 python-box = "^7.2.0"
@@ -25,12 +22,19 @@ xarray = "^2024.6.0"
 scikit-learn = "^1.5.1"
 xgboost = "^2.1.0"
 # malevich = {url = "https://github.com/MalevichAI/malevich/archive/dev/unstable.zip"}
+huggingface-hub = "^0.23.5"
+# vit-pytorch = "^1.7.0"
+
 
 [tool.poetry.group.app.dependencies]
 fastapi = "^0.111.0"
 uvicorn = {extras = ["standard"], version = "^0.30.1"}
 gunicorn = "^22.0.0"
 supabase = "^2.5.1"
+
+[tool.poetry.group.torch.dependencies]
+torch = "2.3.1"
+torchvision = "0.18.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^24.4.2"

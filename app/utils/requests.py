@@ -1,7 +1,7 @@
 from typing import Any, Dict
 
 import requests
-from async_lru import alru_cache
+# from async_lru import alru_cache <-- not used and missing in python env fsr
 
 # @alru_cache
 # async def fetch_ip_data(ip: str) -> Dict[str, Any]:
