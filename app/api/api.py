@@ -18,14 +18,23 @@ from loguru import logger
 
 from app.config import config, supabase
 from app.schemas.auth import LoginData, Token, UserData
-from app.schemas.clay import (ClassificationLabels, Embeddings, Images, InferenceData, Points, SegmentationLabel,
-                              SegmentationLabels, TrainClassificationData, TrainResults, TrainSegmentationData)
+from app.schemas.clay import (
+    ClassificationLabels,
+    Embeddings,
+    Images,
+    InferenceData,
+    Points,
+    SegmentationLabel,
+    SegmentationLabels,
+    TrainClassificationData,
+    TrainResults,
+    TrainSegmentationData,
+)
 from app.schemas.common import TextResponse
 from app.utils.auth import get_current_user
 from app.utils.logging import LoggingRoute
 from clay.model import get_embedding, get_embeddings_img
-from clay.train import (SegmentationDataModule, SegmentationDataset, SegmentorTraining, predict_classification,
-                        train_classification)
+from clay.train import SegmentationDataModule, SegmentorTraining, predict_classification, train_classification
 from clay.utils import get_catalog_items, get_stack, stack_to_datacube
 
 api_router = APIRouter(route_class=LoggingRoute)
@@ -37,8 +46,8 @@ async def train_classification_model(data: TrainClassificationData) -> TrainResu
     embeddings = await get_embeddings_with_images(data)
     model, details = train_classification(embeddings=np.array(embeddings.embeddings), labels=np.array(data.labels))
     model_bytes = pickle.dumps(model)
-    model_name = f"classification_{len(embeddings.embeddings)}_{''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(5))}"
-    response = supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).upload(path=model_name + ".pkl", file=model_bytes)
+    model_name = f"checkpoints/classification/{len(embeddings.embeddings)}_{''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(5))}.pkl"
+    response = supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).upload(path=model_name, file=model_bytes)
     return TrainResults(model_id=model_name, train_details=details)
 
 
@@ -46,7 +55,7 @@ async def train_classification_model(data: TrainClassificationData) -> TrainResu
 async def infer_classification_model(data: InferenceData) -> ClassificationLabels:
     """Run inference of previously trained classification model on your data."""
     embeddings = await get_embeddings_with_images(data)
-    model = pickle.loads(supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).download(path=data.model_id + ".pkl"))
+    model = pickle.loads(supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).download(path=data.model_id))
     labels = predict_classification(clf=model, embeddings=np.array(embeddings.embeddings))
     return ClassificationLabels(labels=labels.tolist())
 
