@@ -282,7 +282,7 @@ class SegmentorTraining(L.LightningModule):
         labels = batch["label"].long()
         outputs = self(batch)
         outputs = F.interpolate(
-            outputs, size=(224, 224), mode="bilinear", align_corners=False
+            outputs, size=(labels.shape[-2], labels.shape[-1]), mode="bilinear", align_corners=False
         )  # Resize to match labels size
 
         loss = self.loss_fn(outputs, labels)
