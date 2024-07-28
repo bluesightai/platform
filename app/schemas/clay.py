@@ -109,18 +109,10 @@ class Embeddings(BaseModel):
     )
 
 
-class SegmentationLabel(BaseModel):
-    label: List[List[int]] = Field(
-        examples=[[[random.randint(0, 1) for _ in range(16)] for _ in range(16)]],
-        description="2D (h, w) label array",
-    )
-
-
 class SegmentationLabels(BaseModel):
-    labels: List[SegmentationLabel] = Field(
-        examples=[
-            [SegmentationLabel(label=[[random.randint(0, 1) for _ in range(16)] for _ in range(16)]) for _ in range(2)]
-        ]
+    labels: List[List[List[int]]] = Field(
+        examples=[[[[random.randint(0, 1) for _ in range(16)] for _ in range(16)] for _ in range(2)]],
+        description="3D (b, h, w) label array.",
     )
 
 
@@ -129,7 +121,7 @@ class ClassificationLabels(BaseModel):
 
 
 class ModelData(BaseModel):
-    model_id: str = Field(
+    model: str = Field(
         examples=["checkpoints/classification/2_Ugslf.pkl", "checkpoints/segmentation/2_sQoFF.ckpt"],
         description="Model to use. Get this value from according `/train` endpoint.",
     )
