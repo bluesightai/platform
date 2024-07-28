@@ -1,9 +1,11 @@
-__pycache__
-.ipynb_checkpoints
-.vim-arsync
+.cache/
 data/
 indexes/
 models/
-.cache/
-malevich.secrets.yaml
+checkpoints/
+wandb/
+__pycache__/
+.ipynb_checkpoints/
 .env
+.vim-arsync
+malevich.secrets.yaml
