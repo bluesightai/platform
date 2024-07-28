@@ -149,3 +149,23 @@ class InferenceData(ModelData, Images):
 
 class TrainResults(ModelData):
     train_details: Dict[str, Any] | None
+
+
+class FileObject(BaseModel):
+    id: str
+    """The file identifier, which can be referenced in the API endpoints."""
+
+    bytes: int
+    """The size of the file, in bytes."""
+
+    created_at: int
+    """The Unix timestamp (in seconds) for when the file was created."""
+
+    filename: str
+    """The name of the file."""
+
+
+class FileDeleted(BaseModel):
+    id: str
+
+    deleted: bool
