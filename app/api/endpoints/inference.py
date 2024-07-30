@@ -1,29 +1,37 @@
-import os
 import pickle
-from datetime import datetime
-from typing import List, Tuple
 
 import numpy as np
-import torch
-import torch.nn.functional as F
 from fastapi import APIRouter
-from loguru import logger
 
 from app.api.endpoints.embeddings import get_embeddings_with_images
 from app.config import config, supabase
-from app.schemas.clay import ClassificationLabels, InferenceData, SegmentationLabels
-from clay.train import SegmentationDataModule, SegmentorTraining, predict_classification
+from app.schemas.clay import ClassificationLabels, Images, InferenceData, SegmentationLabels
+from app.utils.logging import LoggingRoute
+from clay.train import predict_classification
 
 router = APIRouter(route_class=LoggingRoute)
 
 
-@router.post("/classification")
-async def infer_classification_model(data: InferenceData) -> ClassificationLabels:
+@router.post("")
+async def run_trained_model_inference(inference_data: InferenceData) -> ClassificationLabels | SegmentationLabels:
     """Run inference of previously trained classification model on your data."""
-    embeddings = await get_embeddings_with_images(data)
-    model = pickle.loads(supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).download(path=data.model))
-    labels = predict_classification(clf=model, embeddings=np.array(embeddings.embeddings))
-    return ClassificationLabels(labels=labels.tolist())
+
+    model_path = config.FILES_CACHE_DIR / inference_data.model
+    if not model_path.exists():
+        with open(model_path, "wb") as f:
+            f.write(supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).download(path=inference_data.model))
+
+    if "classification" in inference_data.model:
+        with open(model_path, "rb") as f:
+            model = pickle.load(f)
+
+        embeddings = await get_embeddings_with_images(Images(images=inference_data.images))
+        labels = predict_classification(clf=model, embeddings=np.array(embeddings.embeddings))
+        return ClassificationLabels(labels=labels.tolist())
+    elif "segmentation" in inference_data.model:
+        return SegmentationLabels(labels=[[]])
+    else:
+        raise ValueError(f"Unknown model type: {inference_data.model}. Supported models: classification, segmentation")
 
 
 @router.post("/segmentation")
