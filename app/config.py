@@ -14,6 +14,7 @@ class Config(BaseSettings):
     SUPABASE_REQUESTS_TABLE: str = "requests"
     SUPABASE_IP_DATA_TABLE: str = "ip_data"
     SUPABASE_FILES_METADATA_TABLE: str = "files_metadata"
+    SUPABASE_TRAINING_JOBS_TABLE: str = "training_jobs"
     SUPABASE_MODEL_BUCKET: str = "models"
     SUPABASE_FILES_BUCKET: str = "files"
     FILES_CACHE_DIR: Path = Path(".cache/")
