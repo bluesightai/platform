@@ -35,7 +35,7 @@ def log_request(request_data: Dict[str, Any]):
 
     delete_keys(request_data)
 
-    logger.info(truncating_pformat(request_data))
+    # logger.info(truncating_pformat(request_data))
 
     if not supabase.table(config.SUPABASE_IP_DATA_TABLE).select("*").eq("ip", request_data["ip"]).execute().data:
         logger.info(f"ip {request_data['ip']} is not present, retrieving it...")
@@ -57,6 +57,7 @@ class LoggingRoute(APIRoute):
         async def custom_route_handler(request: Request) -> Response:
 
             start_time = time.time()
+            logger.info(f"Received {request.method} request for {request.url}")
             try:
                 response = await original_route_handler(request)
             except HTTPException as e:
