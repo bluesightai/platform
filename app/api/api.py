@@ -11,6 +11,7 @@ async def root():
     return {"message": "Welcome to Bluesight API! Documentation available at https://docs.bluesight.ai/api-reference."}
 
 
+api_router.include_router(train.router, prefix="/training/jobs", tags=["Training Jobs"])
 api_router.include_router(inference.router, prefix="/inference", tags=["Inference"])
 api_router.include_router(embeddings.router, prefix="/embeddings", tags=["Embeddings"])
 api_router.include_router(files.router, prefix="/files", tags=["Files"])
