@@ -5,9 +5,10 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.config import config, supabase
 from app.schemas.clay import FileDeleted, FileObject
+from app.utils.logging import LoggingRoute
 from app.utils.misc import random_string
 
-router = APIRouter()
+router = APIRouter(route_class=LoggingRoute)
 
 
 @router.post("")

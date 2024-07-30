@@ -14,7 +14,7 @@ from app.config import config, supabase
 from app.schemas.clay import ClassificationLabels, InferenceData, SegmentationLabels
 from clay.train import SegmentationDataModule, SegmentorTraining, predict_classification
 
-router = APIRouter()
+router = APIRouter(route_class=LoggingRoute)
 
 
 @router.post("/classification")

@@ -5,8 +5,9 @@ from app.config import supabase
 from app.schemas.auth import LoginData, Token, UserData
 from app.schemas.common import TextResponse
 from app.utils.auth import get_current_user
+from app.utils.logging import LoggingRoute
 
-router = APIRouter()
+router = APIRouter(route_class=LoggingRoute)
 
 
 @router.post("/register")

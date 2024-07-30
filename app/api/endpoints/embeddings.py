@@ -4,10 +4,11 @@ from typing import List, Tuple
 from fastapi import APIRouter
 
 from app.schemas.clay import Embeddings, Images, Points
+from app.utils.logging import LoggingRoute
 from clay.model import get_embedding, get_embeddings_img
 from clay.utils import get_catalog_items, get_stack, stack_to_datacube
 
-router = APIRouter()
+router = APIRouter(route_class=LoggingRoute)
 
 
 @router.post("/img")
