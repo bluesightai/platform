@@ -1,5 +1,5 @@
 import random
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 from pydantic import BaseModel, Field, validator
 
@@ -109,38 +109,30 @@ class Embeddings(BaseModel):
     )
 
 
+class ClassificationTrainingDataSample(BaseModel):
+    image: Image
+    label: int
+
+
+class SegmentationTrainingDataSample(BaseModel):
+    image: Image
+    label: List[List[int]]
+
+
+class InferenceData(BaseModel):
+    model: str
+    images: List[Image]
+
+
+class ClassificationLabels(BaseModel):
+    labels: List[int]
+
+
 class SegmentationLabels(BaseModel):
     labels: List[List[List[int]]] = Field(
         examples=[[[[random.randint(0, 1) for _ in range(16)] for _ in range(16)] for _ in range(2)]],
         description="3D (b, h, w) label array.",
     )
-
-
-class ClassificationLabels(BaseModel):
-    labels: List[int] = Field(examples=[[0, 1]], description="Classification labels. Must start with 0.")
-
-
-class ModelData(BaseModel):
-    model: str = Field(
-        examples=["checkpoints/classification/2_Ugslf.pkl", "checkpoints/segmentation/2_sQoFF.ckpt"],
-        description="Model to use. Get this value from according `/train` endpoint.",
-    )
-
-
-class TrainClassificationData(Images, ClassificationLabels):
-    pass
-
-
-class TrainSegmentationData(Images, SegmentationLabels):
-    pass
-
-
-class InferenceData(ModelData, Images):
-    pass
-
-
-class TrainResults(ModelData):
-    train_details: Dict[str, Any] | None
 
 
 class FileObject(BaseModel):
