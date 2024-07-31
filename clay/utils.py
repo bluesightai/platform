@@ -369,7 +369,10 @@ class Stats(TypedDict):
 
 
 def get_stats(
-    bands: List[str], pixels: List[List[List[List[float]]]], platform: str | None, wavelengths: List[float] | None
+    bands: List[str],
+    pixels: List[List[List[List[float]]]],
+    platform: str | None,
+    wavelengths: List[float] | None,
 ) -> Stats:
     mean: List[float] = []
     std: List[float] = []
