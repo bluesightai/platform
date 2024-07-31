@@ -1,6 +1,8 @@
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+import h5py
 import lightning as L
 import numpy as np
 import segmentation_models_pytorch as smp
@@ -50,6 +52,140 @@ def predict_classification(clf: svm.SVC, embeddings: NDArray) -> NDArray:
 
 
 class SegmentationDataset(Dataset):
+    """
+    Dataset class for the Chesapeake Bay segmentation dataset.
+    """
+
+    def __init__(
+        self,
+        file_path: Path,
+    ):
+
+        self.file_path = file_path
+        self.f = h5py.File(file_path, "r")
+        self.dataset: h5py.Dataset = self.f["data"]
+
+        # with h5py.File(file_path, "r") as f:
+        # dataset: h5py.Dataset = f["data"]
+        first_item: Dataset = self.dataset[0]
+
+        self.length = len(self.dataset)
+        self.gsd = first_item["gsd"].item()
+        self.bands = [band.decode("ascii") for band in first_item["bands"]]
+        self.platform = first_item["platform"].decode("ascii")
+        self.stats = get_stats(bands=self.bands, pixels=first_item["pixels"], platform=self.platform, wavelengths=None)
+
+        logger.debug(f"Found dataset of {self.length} samples.")
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, idx):
+
+        # with h5py.File(self.file_path, "r") as f:
+
+        # dataset: h5py.Dataset = f["data"]
+
+        datacube = get_datacube(
+            gsd=self.gsd,
+            stats=self.stats,
+            pixels=[self.dataset[idx]["pixels"]],
+            datetimes=[datetime.utcfromtimestamp(self.dataset[idx]["timestamp"])],
+            points=[self.dataset[idx]["point"].tolist()],
+        )
+
+        datacube["pixels"] = datacube["pixels"][0]
+        datacube["time"] = datacube["time"][0]
+        datacube["latlon"] = datacube["latlon"][0]
+        datacube["label"] = torch.from_numpy(self.dataset[idx]["label"])
+
+        return datacube
+
+
+class SegmentationDataModule(L.LightningDataModule):
+
+    def __init__(  # noqa: PLR0913
+        self,
+        train_file_path: Path,
+        validation_file_path: Path | None,
+        batch_size: int,
+        num_workers: int,
+    ):
+        super().__init__()
+        self.train_file_path = train_file_path
+        self.validation_file_path = validation_file_path
+
+        self.batch_size = batch_size
+        self.num_workers = num_workers
+
+    def setup(self, stage=None):
+        """
+        Setup datasets for training and validation.
+
+        Args:
+            stage (str): Stage identifier ('fit' or 'test').
+        """
+        if stage in {"fit", None}:
+            self.trn_ds = SegmentationDataset(
+                file_path=self.train_file_path,
+            )
+            self.val_ds = None
+            if self.validation_file_path:
+                self.val_ds = SegmentationDataset(
+                    file_path=self.validation_file_path,
+                )
+
+    def train_dataloader(self):
+        return DataLoader(
+            self.trn_ds,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            collate_fn=CustomBatchCollator(),
+        )
+
+    def val_dataloader(self):
+        if not self.val_ds:
+            return None
+        return DataLoader(
+            self.val_ds,
+            batch_size=self.batch_size,
+            num_workers=self.num_workers,
+            collate_fn=CustomBatchCollator(),
+        )
+
+
+class CustomBatchCollator:
+    def __call__(self, batch):
+        # Extract the elements we want to stack
+        pixels = [item["pixels"] for item in batch]
+        times = [item["time"] for item in batch]
+        latlons = [item["latlon"] for item in batch]
+
+        # Stack these elements
+        stacked_pixels = default_collate(pixels)
+        stacked_times = default_collate(times)
+        stacked_latlons = default_collate(latlons)
+
+        # Create the output dictionary
+        output = {
+            "platform": batch[0]["platform"],
+            "gsd": batch[0]["gsd"],
+            "waves": batch[0]["waves"],
+            "pixels": stacked_pixels,
+            "time": stacked_times,
+            "latlon": stacked_latlons,
+        }
+
+        if "label" in batch[0]:
+            labels = [item["label"] for item in batch]
+            stacked_labels = default_collate(labels)
+            output |= {"label": stacked_labels}
+
+        return output
+
+
+class SegmentationDatasetInference(Dataset):
     """
     Dataset class for the Chesapeake Bay segmentation dataset.
 
@@ -103,37 +239,7 @@ class SegmentationDataset(Dataset):
         return datacube
 
 
-class CustomBatchCollator:
-    def __call__(self, batch):
-        # Extract the elements we want to stack
-        pixels = [item["pixels"] for item in batch]
-        times = [item["time"] for item in batch]
-        latlons = [item["latlon"] for item in batch]
-
-        # Stack these elements
-        stacked_pixels = default_collate(pixels)
-        stacked_times = default_collate(times)
-        stacked_latlons = default_collate(latlons)
-
-        # Create the output dictionary
-        output = {
-            "platform": batch[0]["platform"],
-            "gsd": batch[0]["gsd"],
-            "waves": batch[0]["waves"],
-            "pixels": stacked_pixels,
-            "time": stacked_times,
-            "latlon": stacked_latlons,
-        }
-
-        if "label" in batch[0]:
-            labels = [item["label"] for item in batch]
-            stacked_labels = default_collate(labels)
-            output |= {"label": stacked_labels}
-
-        return output
-
-
-class SegmentationDataModule(L.LightningDataModule):
+class SegmentationDataModuleInference(L.LightningDataModule):
 
     def __init__(  # noqa: PLR0913
         self,
@@ -171,7 +277,7 @@ class SegmentationDataModule(L.LightningDataModule):
             stage (str): Stage identifier ('fit' or 'test').
         """
         if stage in {"fit", None}:
-            self.trn_ds = SegmentationDataset(
+            self.trn_ds = SegmentationDatasetInference(
                 gsd=self.gsd,
                 bands=self.bands,
                 pixels=self.pixels[: self.n_train_samples],
@@ -181,7 +287,7 @@ class SegmentationDataModule(L.LightningDataModule):
                 datetimes=self.datetimes[: self.n_train_samples],
                 labels=self.labels[: self.n_train_samples] if self.labels else None,
             )
-            self.val_ds = SegmentationDataset(
+            self.val_ds = SegmentationDatasetInference(
                 gsd=self.gsd,
                 bands=self.bands,
                 pixels=self.pixels[self.n_train_samples :],
