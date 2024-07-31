@@ -69,7 +69,7 @@ async def run_trained_model_inference(data: InferenceData) -> SegmentationLabels
             wavelengths=data.images[0].wavelengths,
             points=points,
             datetimes=datetimes,
-            batch_size=40,
+            batch_size=10,
             num_workers=0,
             train_test_ratio=0,
             labels=None,
