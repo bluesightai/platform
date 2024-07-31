@@ -1,21 +1,24 @@
-import os
-import pandas as pd
-from shapely import wkb
 import multiprocessing
-from tqdm import tqdm
 import traceback
-import logging
+import pandas as pd
 import psycopg2
+import logging
+from typing import List, Tuple
+from psycopg2.extensions import AsIs
+from psycopg2.extras import execute_values
 from psycopg2.extras import execute_batch
+from scripts.vector_geo_utils import db
+from tqdm import tqdm
+import os 
+from shapely import wkb
+from db import postgres_uri
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# PostgreSQL connection URI
 
-password = """{[Q.~u:z1F94q;sg\\!JNm^'iX"""
 
-postgres_uri = f"postgresql://postgres.biccczfztgnfaqzmizan:{password}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+
 
 def batch_insert_parquet_to_postgres(args):
     parquet_file_path, batch_size = args
@@ -47,7 +50,7 @@ def batch_insert_parquet_to_postgres(args):
         
         # Insert any remaining data
         if data_to_insert:
-            with psycopg2.connect(postgres_uri) as conn:
+            with psycopg2.connect(db) as conn:
                 with conn.cursor() as cur:
                     query = """
                     INSERT INTO search_boxes (location, embedding)
