@@ -18,6 +18,7 @@ class Config(BaseSettings):
     SUPABASE_MODEL_BUCKET: str = "models"
     SUPABASE_FILES_BUCKET: str = "files"
     FILES_CACHE_DIR: Path = Path(".cache/")
+    CHECKPOINTS_DIR: Path = Path("checkpoints/")
 
 
 config = Config()
