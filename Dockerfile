@@ -1,5 +1,4 @@
 # FROM python:3.11
-# FROM malevichai/app:python-torch_v0.1
 FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
 
 # Install poetry separated from system interpreter
@@ -31,5 +30,4 @@ RUN poetry config virtualenvs.create false && poetry install --no-interaction
 COPY ./scripts ./scripts
 COPY ./app ./app
 
-# COPY ./clay/malevich/bindings.py ./apps/
-CMD [ "gunicorn", "app.main:app", "--bind", "0.0.0.0:8000", "--workers", "2", "--worker-class", "app.utils.worker.ProxyUvicornWorker", "--timeout", "1800" ]
+CMD [ "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--timeout-keep-alive", "1800", "--forwarded-allow-ips", "\"*\"" ]
