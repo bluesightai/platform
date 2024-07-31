@@ -2,12 +2,14 @@ import asyncio
 import json
 import pickle
 import secrets
+import shutil
 import string
 from datetime import datetime, timezone
 from multiprocessing import Process
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+import h5py
 import lightning as L
 import numpy as np
 from fastapi import APIRouter, HTTPException
@@ -23,8 +25,8 @@ from app.schemas.train import TrainingJob, TrainingJobRequest
 from app.utils.logging import LoggingRoute
 from app.utils.misc import random_string
 from app.utils.requests import download_file_in_chunks
-from app.utils.validation import validate_jsonl
-from clay.train import SegmentationDataModule, SegmentorTraining, train_classification
+from app.utils.validation import validate_hdf5, validate_jsonl
+from clay.train import SegmentationDataModule, SegmentationDataset, SegmentorTraining, train_classification
 
 router = APIRouter(route_class=LoggingRoute)
 
@@ -130,9 +132,11 @@ async def execute_training_job(training_job_id: str):
             "id", training_job_id
         ).execute()
 
-        validate_jsonl(file_path=training_file_path, task=training_job["task"])
+        logger.info(f"Validating training file: {training_file_path}")
+
+        validate_hdf5(file_path=training_file_path, task=training_job["task"])
         if validation_file_path:
-            validate_jsonl(file_path=validation_file_path, task=training_job["task"])
+            validate_hdf5(file_path=validation_file_path, task=training_job["task"])
 
         supabase.table(config.SUPABASE_TRAINING_JOBS_TABLE).update({"status": "running"}).eq(
             "id", training_job_id
@@ -141,6 +145,8 @@ async def execute_training_job(training_job_id: str):
         model_name = ""
         if training_job["task"] == "classification":
             model_name = await train_classification_model(training_file_path, validation_file_path)
+        elif training_job["task"] == "segmentation":
+            model_name = await train_segmentation_model(training_file_path, validation_file_path)
 
         supabase.table(config.SUPABASE_TRAINING_JOBS_TABLE).update(
             {
@@ -151,6 +157,7 @@ async def execute_training_job(training_job_id: str):
         ).eq("id", training_job_id).execute()
 
     except Exception as e:
+        raise e
         supabase.table(config.SUPABASE_TRAINING_JOBS_TABLE).update(
             {
                 "status": "failed",
@@ -169,12 +176,20 @@ async def train_classification_model(
     training_images: List[Image] = []
     training_labels: List[int] = []
 
-    with open(training_file_path, "r") as file:
-        for line in file:
-            data = json.loads(line)
-            sample = ClassificationTrainingDataSample(**data)
-            training_images.append(sample.image)
-            training_labels.append(sample.label)
+    with h5py.File(training_file_path, "r") as f:
+        for sample in f["data"]:
+
+            image = {
+                "bands": [band.decode("ascii") for band in sample["bands"]],
+                "gsd": sample["gsd"].item(),
+                "pixels": sample["pixels"],
+                "platform": sample["platform"].decode("ascii"),
+                "point": sample["point"].tolist(),
+                "timestamp": sample["timestamp"].item(),
+            }
+            label = sample["label"].item()
+            training_images.append(Image(**image))
+            training_labels.append(label)
 
     embeddings = await get_embeddings_with_images(images=Images(images=training_images))
 
@@ -189,56 +204,24 @@ async def train_classification_model(
     return model_name
 
 
-async def train_classification_model(data: TrainClassificationData) -> TrainResults:
-    """Train classification model on your data."""
-    embeddings = await get_embeddings_with_images(data)
-    model, details = train_classification(embeddings=np.array(embeddings.embeddings), labels=np.array(data.labels))
-    model_bytes = pickle.dumps(model)
-    model_name = f"checkpoints/classification/{len(embeddings.embeddings)}_{''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(5))}.pkl"
-    response = supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).upload(path=model_name, file=model_bytes)
-    return TrainResults(model=model_name, train_details=details)
-
-
-async def train_segmentation_model(data: TrainSegmentationData) -> TrainResults:
+async def train_segmentation_model(
+    training_file_path: Path,
+    validation_file_path: Path | None = None,
+    hyperparameters: Dict[str, Any] | None = None,
+) -> str:
     """Train segmentation model on your data."""
 
-    pixels: List[List[List[List[float]]]] = []
-    points: List[Tuple[float, float] | None] = []
-    datetimes: List[datetime | None] = []
-    # Check consistency of platform, gsd, and bands
-    first_image = data.images[0]
-    platform, gsd, bands = first_image.platform, first_image.gsd, first_image.bands
-    pixel_shape = None
-    for image in data.images:
-        if image.platform != platform:
-            raise ValueError("Inconsistent platform across images")
-        if image.gsd != gsd:
-            raise ValueError("Inconsistent gsd across images")
-        if image.bands != bands:
-            raise ValueError("Inconsistent bands across images")
+    # dataset = SegmentationDataset(file_path=training_file_path)
+    # print(dataset[0])
 
-        if pixel_shape is None:
-            pixel_shape = len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])
-        elif (len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])) != pixel_shape:
-            raise ValueError("Inconsistent pixel shapes across images")
-
-        pixels.append(image.pixels)
-        points.append(image.point)
-        datetimes.append(datetime.fromtimestamp(image.timestamp) if image.timestamp else None)
-    unique_classes = np.unique(data.labels)
-    num_classes = len(unique_classes)
+    # num_classes = len(np.unique(data.labels))
+    num_classes = 7
     logger.info(f"Found {num_classes} unique classes!")
 
     data_module = SegmentationDataModule(
-        gsd=data.images[0].gsd,
-        bands=data.images[0].bands,
-        pixels=pixels,
-        platform=data.images[0].platform,
-        wavelengths=data.images[0].wavelengths,
-        points=points,
-        datetimes=datetimes,
-        labels=data.labels,
-        batch_size=40,
+        train_file_path=training_file_path,
+        validation_file_path=validation_file_path,
+        batch_size=30,
         num_workers=0,
     )
 
@@ -252,11 +235,12 @@ async def train_segmentation_model(data: TrainSegmentationData) -> TrainResults:
         b2=0.95,
     )
 
-    save_path = f"checkpoints/segmentation/{len(pixels)}_{''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(5))}"
+    model_name = f"model:segmentation-{random_string()}"
+    save_path = config.CHECKPOINTS_DIR / model_name
     checkpoint_callback = ModelCheckpoint(
         dirpath=save_path,
-        filename="7class-segment_epoch-{epoch:02d}_val-iou-{val/iou:.4f}",
-        monitor="val/iou",
+        filename="7class-segment_epoch-{epoch:02d}_val-iou-{(val/iou if val/iou else train/iou):.4f}",
+        monitor="val/iou" if validation_file_path else "train/iou",
         mode="max",
         save_last=True,
         save_top_k=2,
@@ -281,14 +265,20 @@ async def train_segmentation_model(data: TrainSegmentationData) -> TrainResults:
         # logger=wandb_logger,
         callbacks=[checkpoint_callback, lr_monitor],
         plugins=[AsyncCheckpointIO()],
+        val_check_interval=0 if not validation_file_path else None,
+        limit_val_batches=0 if not validation_file_path else None,
     )
 
     L.seed_everything(42)
 
     trainer.fit(model, datamodule=data_module)
 
-    model_id = save_path + ".ckpt"
-    with open(save_path + "/last.ckpt", "rb") as f:
-        response = supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).upload(path=model_id, file=f)
+    final_model_path = save_path / "last.ckpt"
+    cache_model_path = config.FILES_CACHE_DIR / model_name
+    # cp final_model_path cache_path
+    shutil.copy(final_model_path, cache_model_path)
 
-    return TrainResults(model=model_id, train_details=None)
+    with open(cache_model_path, "rb") as f:
+        response = supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).upload(path=model_name, file=f)
+
+    return model_name
