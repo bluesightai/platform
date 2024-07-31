@@ -58,9 +58,11 @@ async def retrieve_training_job(training_job_id: str) -> TrainingJob:
         raise HTTPException(status_code=404, detail="Training job not found")
 
     training_job = result.data[0]
-    training_job["created_at"] = int(datetime.fromisoformat(training_job["created_at"]).timestamp())
+    # training_job["created_at"] = int(datetime.fromisoformat(training_job["created_at"].replace('+00:00', 'Z')).timestamp())
+    training_job["created_at"] = int(datetime.strptime(training_job["created_at"], "%Y-%m-%dT%H:%M:%S.%f%z").timestamp())
     training_job["finished_at"] = (
-        int(datetime.fromisoformat(training_job["finished_at"]).timestamp())
+        # int(datetime.fromisoformat(training_job["finished_at"]).timestamp())
+        int(datetime.strptime(training_job["finished_at"], "%Y-%m-%dT%H:%M:%S.%f%z").timestamp())
         if training_job.get("finished_at")
         else None
     )
