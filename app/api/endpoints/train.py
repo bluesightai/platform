@@ -157,7 +157,7 @@ async def execute_training_job(training_job_id: str):
         ).eq("id", training_job_id).execute()
 
     except Exception as e:
-        raise e
+        # raise e
         supabase.table(config.SUPABASE_TRAINING_JOBS_TABLE).update(
             {
                 "status": "failed",
@@ -183,9 +183,9 @@ async def train_classification_model(
                 "bands": [band.decode("ascii") for band in sample["bands"]],
                 "gsd": sample["gsd"].item(),
                 "pixels": sample["pixels"],
-                "platform": sample["platform"].decode("ascii"),
-                "point": sample["point"].tolist(),
-                "timestamp": sample["timestamp"].item(),
+                "platform": sample["platform"].decode("ascii") or None,
+                "point": sample["point"].tolist() if sum(sample["point"]) != 0 else None,
+                "timestamp": sample["timestamp"].item() or None,
             }
             label = sample["label"].item()
             training_images.append(Image(**image))
