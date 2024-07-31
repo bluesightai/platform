@@ -1,5 +1,7 @@
+from pathlib import Path
 from typing import Any, Dict
 
+import aiohttp
 import requests
 from async_lru import alru_cache
 
@@ -26,3 +28,15 @@ def fetch_ip_data(ip: str) -> Dict[str, Any]:
         data = {"query": ip}
         print(f"Request failed with status code: {response.status_code}")
     return data
+
+
+async def download_file_in_chunks(url: str, path: Path, chunk_size: int = 10 * 2**20):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as res:
+            res.raise_for_status()
+            with open(path, "wb+") as f:
+                while True:
+                    chunk = await res.content.read(chunk_size)
+                    if not chunk:
+                        break
+                    f.write(chunk)

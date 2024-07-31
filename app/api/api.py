@@ -1,162 +1,18 @@
-import pickle
-import secrets
-import string
-from datetime import datetime
-from typing import List, Tuple
+from fastapi import APIRouter
 
-import numpy as np
-from fastapi import APIRouter, Depends, HTTPException, status
-from gotrue import UserResponse
-
-from app.config import config, supabase
-from app.schemas.auth import LoginData, Token, UserData
-from app.schemas.clay import (
-    ClassificationLabels,
-    Embeddings,
-    Images,
-    InferenceData,
-    Points,
-    SegmentationLabels,
-    TrainClassificationData,
-    TrainResults,
-    TrainSegmentationData,
-)
-from app.schemas.common import TextResponse
-from app.utils.auth import get_current_user
+from app.api.endpoints import auth, embeddings, files, inference, train
 from app.utils.logging import LoggingRoute
-from clay.model import get_embedding, get_embeddings_img
-from clay.train import predict_classification, train_classification
-from clay.utils import get_catalog_items, get_stack, stack_to_datacube
 
 api_router = APIRouter(route_class=LoggingRoute)
 
 
-@api_router.post("/train/classification", tags=["Train"])
-async def train_classification_model(data: TrainClassificationData) -> TrainResults:
-    """Train classification model on your data."""
-    embeddings = await get_embeddings_with_images(data)
-    model, details = train_classification(embeddings=np.array(embeddings.embeddings), labels=np.array(data.labels))
-    model_bytes = pickle.dumps(model)
-    model_name = f"classification_{len(embeddings.embeddings)}_{''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(5))}"
-    response = supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).upload(path=model_name + ".pkl", file=model_bytes)
-    return TrainResults(model_id=model_name, train_details=details)
+@api_router.get("/", include_in_schema=False)
+async def root():
+    return {"message": "Welcome to Bluesight API! Documentation available at https://docs.bluesight.ai/api-reference."}
 
 
-@api_router.post("/inference/classification", tags=["Train"])
-async def infer_classification_model(data: InferenceData) -> ClassificationLabels:
-    """Run inference of previously trained classification model on your data."""
-    embeddings = await get_embeddings_with_images(data)
-    model = pickle.loads(supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).download(path=data.model_id + ".pkl"))
-    labels = predict_classification(clf=model, embeddings=np.array(embeddings.embeddings))
-    return ClassificationLabels(labels=labels.tolist())
-
-
-@api_router.post("/train/segmentation", tags=["Train"])
-async def train_segmentation_model(data: TrainSegmentationData) -> TrainResults:
-    """Train segmentation model on your data."""
-    # model_bytes = pickle.dumps(model)
-    # model_name = f"segmentation_{len(embeddings.embeddings)}_{''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(5))}"
-    # response = supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).upload(path=model_name + ".pkl", file=model_bytes)
-    return TrainResults(model_id="123", train_details=None)
-
-
-@api_router.post("/inference/segmentation", tags=["Train"])
-async def infer_segmentation_model(data: InferenceData) -> SegmentationLabels:
-    """Run inference of previously trained segmentation model on your data."""
-    # embeddings = await get_embeddings_with_images(data)
-    # model = pickle.loads(supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).download(path=data.model_id + ".pkl"))
-    # labels = predict_classification(clf=model, embeddings=np.array(embeddings.embeddings))
-    return SegmentationLabels(labels=[])
-
-
-@api_router.post("/embeddings/img", tags=["Embeddings"])
-async def get_embeddings_with_images(images: Images) -> Embeddings:
-    """Get embeddings for a list of images."""
-    pixels: List[List[List[List[float]]]] = []
-    points: List[Tuple[float, float] | None] = []
-    datetimes: List[datetime | None] = []
-    # Check consistency of platform, gsd, and bands
-    first_image = images.images[0]
-    platform, gsd, bands = first_image.platform, first_image.gsd, first_image.bands
-    pixel_shape = None
-    for image in images.images:
-        if image.platform != platform:
-            raise ValueError("Inconsistent platform across images")
-        if image.gsd != gsd:
-            raise ValueError("Inconsistent gsd across images")
-        if image.bands != bands:
-            raise ValueError("Inconsistent bands across images")
-
-        if pixel_shape is None:
-            pixel_shape = len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])
-        elif (len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])) != pixel_shape:
-            raise ValueError("Inconsistent pixel shapes across images")
-
-        pixels.append(image.pixels)
-        points.append(image.point)
-        datetimes.append(datetime.fromtimestamp(image.timestamp) if image.timestamp else None)
-
-    embeddings = get_embeddings_img(
-        gsd=images.images[0].gsd,
-        bands=images.images[0].bands,
-        pixels=pixels,
-        platform=images.images[0].platform,
-        wavelengths=images.images[0].wavelengths,
-        points=points,
-        datetimes=datetimes,
-    ).tolist()
-    return Embeddings(embeddings=embeddings)
-
-
-@api_router.post("/embeddings/loc", tags=["Embeddings"])
-async def get_embeddings_with_coordinates(points: Points) -> Embeddings:
-    """Get embeddings for a list of points."""
-    items = [get_catalog_items(lat=lat, lon=lon, start="2022-01-01") for lat, lon in points.points]
-    stacks = [
-        get_stack(lat=lat, lon=lon, items=item, size=points.size, gsd=0.6)
-        for item, (lat, lon) in zip(items, points.points)
-    ]
-    datacubes = [stack_to_datacube(lat=lat, lon=lon, stack=stack) for stack, (lat, lon) in zip(stacks, points.points)]
-    return Embeddings(embeddings=[get_embedding(datacube=datacube).tolist() for datacube in datacubes])
-
-
-@api_router.post("/auth/register", tags=["Authentication"], include_in_schema=False)
-async def register(user_data: UserData) -> TextResponse:
-    """Login endpoint
-
-    ## This is login endpoint
-    """
-    try:
-        response = supabase.auth.sign_up(
-            {
-                "email": user_data.email,
-                "password": user_data.password,
-                "options": {"data": {"first_name": user_data.first_name, "last_name": user_data.last_name}},
-            }
-        )
-        return TextResponse(message="Check your email for verification!")
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-
-@api_router.get("/auth/token", response_model=Token, tags=["Authentication"], include_in_schema=False)
-async def get_token(login_data: LoginData) -> Token:
-    try:
-        response = supabase.auth.sign_in_with_password({"email": login_data.email, "password": login_data.password})
-        if not response.session:
-            raise HTTPException(status_code=400, detail="User not found")
-        access_token = response.session.access_token
-        return Token(access_token=access_token, token_type="bearer")
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-
-@api_router.get("/auth/me", tags=["Authentication"], include_in_schema=False)
-async def get_my_data(current_user: UserResponse = Depends(get_current_user)):
-    return current_user
-
-
-# @api_router.post("/inference/classification", tags=["inference"])
-# async def inference_classification(model_id: str, images: List[ImageData]) -> List[int]:
-#     """Embeddings endpoint"""
-#     return [2, 1]
+api_router.include_router(train.router, prefix="/training/jobs", tags=["Training Jobs"])
+api_router.include_router(inference.router, prefix="/inference", tags=["Inference"])
+api_router.include_router(embeddings.router, prefix="/embeddings", tags=["Embeddings"])
+api_router.include_router(files.router, prefix="/files", tags=["Files"])
+api_router.include_router(auth.router, prefix="/auth", tags=["Authentication"], include_in_schema=False)
