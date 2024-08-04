@@ -37,7 +37,10 @@ async def download_file_from_bucket(session: AsyncClient, file_id: str) -> Path:
 
     local_file_path = config.CACHE_DIR / file_id
     if not local_file_path.exists():
-        logger.info(f"Downloading file {file_id} from bucket")
+        logger.debug(f"Downloading file '{file_id}' from bucket")
         download_url = await session.storage.from_(config.SUPABASE_FILES_BUCKET).get_public_url(file_id)
-        await download_file_in_chunks(url=download_url, path=local_file_path)
+        try:
+            await download_file_in_chunks(url=download_url, path=local_file_path)
+        except Exception as e:
+            raise ValueError(f"Error downloading file '{file_id}'. Probably, the file does not exist.")
     return local_file_path
