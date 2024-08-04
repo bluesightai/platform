@@ -1,6 +1,6 @@
 import json
 import time
-from typing import Any, Callable, Dict
+from typing import Callable
 
 from fastapi import HTTPException, Request, Response, status
 from fastapi.responses import PlainTextResponse
@@ -9,41 +9,9 @@ from loguru import logger
 from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 
-from app.config import config, supabase
-from app.utils.print import truncating_pformat
-from app.utils.requests import fetch_ip_data
-
-
-def delete_keys(d, keys=("pixels", "embeddings", "labels")):
-    if isinstance(d, dict):
-        keys_to_delete = [key for key in d if key in keys]
-        for key in keys_to_delete:
-            del d[key]
-        for value in d.values():
-            delete_keys(value)
-    elif isinstance(d, list):
-        for item in d:
-            delete_keys(item)
-
-
-# maybe async? probably no need as it runs in the background
-def log_request(request_data: Dict[str, Any]):
-    # user
-
-    request_data["body"] = json.loads(request_data["body"].decode("utf-8") if request_data["body"] else "{}" or "{}")
-    request_data["response"] = json.loads(request_data["response"].decode("utf-8"))
-
-    delete_keys(request_data)
-
-    # logger.info(truncating_pformat(request_data))
-
-    if not supabase.table(config.SUPABASE_IP_DATA_TABLE).select("*").eq("ip", request_data["ip"]).execute().data:
-        logger.info(f"ip {request_data['ip']} is not present, retrieving it...")
-        # TODO: error handler
-        ip_data = fetch_ip_data(request_data["ip"])
-        supabase.table(config.SUPABASE_IP_DATA_TABLE).insert({"ip": request_data["ip"], "data": ip_data}).execute()
-
-    supabase.table(config.SUPABASE_REQUESTS_TABLE).insert(request_data).execute()
+from app.api.deps import get_super_client
+from app.api.endpoints.requests import upload_request
+from app.schemas.request_metadata import RequestMetadataCreate
 
 
 class LoggingRoute(APIRoute):
@@ -58,6 +26,8 @@ class LoggingRoute(APIRoute):
 
             start_time = time.time()
             logger.info(f"Received {request.method} request for {request.url}")
+
+            super_client = get_super_client()
             try:
                 response = await original_route_handler(request)
             except HTTPException as e:
@@ -77,26 +47,26 @@ class LoggingRoute(APIRoute):
 
             tasks = response.background
 
-            request_data = {
-                "ip": request.client.host,
-                "headers": dict(request.headers),
-                "method": request.method,
-                "url": str(request.url),
-                "query_params": dict(request.query_params),
-                "body": None,
-                "response_status_code": response.status_code,
-                "response": response.body,
-                "process_time": round(end_time - start_time, 3),
-            }
+            request_metadata = RequestMetadataCreate(
+                ip=request.client.host if request.client else "",
+                headers=dict(request.headers),
+                method=request.method,
+                url=str(request.url),
+                query_params=dict(request.query_params),
+                # body=json.loads(request.body.decode("utf-8")) if request.body else None,
+                response_status_code=response.status_code,
+                response=json.loads(response.body.decode("utf-8")),
+                process_time=round(end_time - start_time, 3),
+            )
 
             if isinstance(response, StreamingResponse):
                 res_body = b""
                 async for item in response.body_iterator:
                     res_body += item
 
-                request_data["response"] = res_body
+                request_metadata.response = json.loads(res_body.decode("utf-8"))
 
-                task = BackgroundTask(log_request, request_data)
+                task = BackgroundTask(upload_request, super_client, request_metadata)
                 response = Response(
                     content=res_body,
                     status_code=response.status_code,
@@ -104,7 +74,7 @@ class LoggingRoute(APIRoute):
                     media_type=response.media_type,
                 )
             else:
-                task = BackgroundTask(log_request, request_data)
+                task = BackgroundTask(upload_request, super_client, request_metadata)
 
             # check if the original response had background tasks already attached to it
             if tasks:
