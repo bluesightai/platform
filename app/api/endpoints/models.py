@@ -33,6 +33,14 @@ async def upload_model(
     return model_metadata
 
 
+async def download_model(session: SessionDep, model_id: str) -> Tuple[ModelMetadata, Path]:
+    local_model_path = config.CACHE_DIR / model_id
+    if not local_model_path.exists():
+        with open(local_model_path, "wb") as f:
+            f.write(await session.storage.from_(config.SUPABASE_MODELS_BUCKET).download(path=model_id))
+    return await retrieve_model_metadata(session, model_id), local_model_path
+
+
 @router.get("/{model_id}")
 async def retrieve_model_metadata(session: SessionDep, model_id: str) -> ModelMetadata:
     model_metadata = await crud_model_metadata.get(db=session, id=model_id)
