@@ -9,8 +9,10 @@ from fastapi import APIRouter
 from loguru import logger
 from pandas._libs.tslibs.timezones import infer_tzinfo
 
+from app.api.deps import SessionDep
 from app.api.endpoints.embeddings import get_embeddings_with_images
-from app.config import config, supabase
+from app.api.endpoints.models import download_model
+from app.config import config
 from app.schemas.clay import ClassificationLabels, Images, InferenceData, SegmentationLabels
 from app.utils.logging import LoggingRoute
 from clay.train import SegmentationDataModuleInference, SegmentorTraining, predict_classification
@@ -19,22 +21,21 @@ router = APIRouter(route_class=LoggingRoute)
 
 
 @router.post("")
-async def run_trained_model_inference(data: InferenceData) -> SegmentationLabels | ClassificationLabels:
+async def run_trained_model_inference(
+    data: InferenceData, session: SessionDep
+) -> SegmentationLabels | ClassificationLabels:
     """Run inference of previously trained classification model on your data."""
 
-    model_path = config.CACHE_DIR / data.model
-    if not model_path.exists():
-        with open(model_path, "wb") as f:
-            f.write(supabase.storage.from_(config.SUPABASE_MODELS_BUCKET).download(path=data.model))
+    model_metadata, local_model_path = await download_model(session, data.model)
 
-    if "classification" in data.model:
-        with open(model_path, "rb") as f:
+    if model_metadata.task == "classification":
+        with open(local_model_path, "rb") as f:
             model = pickle.load(f)
 
-        embeddings = await get_embeddings_with_images(Images(images=data.images))
+        embeddings = await get_embeddings_with_images(Images(images=data.images), session)
         labels = predict_classification(clf=model, embeddings=np.array(embeddings.embeddings))
         return ClassificationLabels(labels=labels.tolist())
-    elif "segmentation" in data.model:
+    elif model_metadata.task == "segmentation":
 
         pixels: List[List[List[List[float]]]] = []
         points: List[Tuple[float, float] | None] = []
@@ -60,7 +61,7 @@ async def run_trained_model_inference(data: InferenceData) -> SegmentationLabels
             points.append(image.point)
             datetimes.append(datetime.fromtimestamp(image.timestamp) if image.timestamp else None)
 
-        model = SegmentorTraining.load_from_checkpoint(model_path)
+        model = SegmentorTraining.load_from_checkpoint(local_model_path)
         data_module = SegmentationDataModuleInference(
             gsd=data.images[0].gsd,
             bands=data.images[0].bands,
