@@ -3,7 +3,7 @@ import pickle
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import h5py
 import lightning as L
@@ -16,15 +16,14 @@ from loguru import logger
 from supabase.client import AsyncClient
 
 from app.api.deps import SessionDep
-from app.api.endpoints.embeddings import get_embeddings_with_images
 from app.api.endpoints.models import upload_model
 from app.config import config
 from app.crud.training_job import crud_training_job
-from app.schemas.clay import Image, Images
 from app.schemas.training_job import TrainingJob, TrainingJobCreate, TrainingJobUpdate
 from app.utils.logging import LoggingRoute
 from app.utils.requests import download_file_from_bucket
 from app.utils.validation import validate_hdf5
+from clay.model import get_embeddings_img
 from clay.train import SegmentationDataModule, SegmentorTraining, train_classification
 
 router = APIRouter(route_class=LoggingRoute)
@@ -124,25 +123,34 @@ async def train_classification_model(
     hyperparameters: Dict[str, Any] | None = None,
 ) -> Path:
 
-    training_images: List[Image] = []
+    pixels: List[List[List[List[float]]]] = []
+    points: List[Tuple[float, float] | None] = []
+    datetimes: List[datetime | None] = []
     training_labels: List[int] = []
     with h5py.File(training_file_path, "r") as f:
+        first_item: h5py.Dataset = f["data"][0]
+        gsd: float = first_item["gsd"].item()
+        bands: list[str] = [band.decode("ascii") for band in first_item["bands"]]
+        platform: str | None = first_item["platform"].decode("ascii") or None
+
         for sample in f["data"]:
 
-            image = {
-                "bands": [band.decode("ascii") for band in sample["bands"]],
-                "gsd": sample["gsd"].item(),
-                "pixels": sample["pixels"],
-                "platform": sample["platform"].decode("ascii") or None,
-                "point": sample["point"].tolist() if sum(sample["point"]) != 0 else None,
-                "timestamp": sample["timestamp"].item() or None,
-            }
-            label = sample["label"].item()
-            training_images.append(Image(**image))
-            training_labels.append(label)
+            pixels.append(sample["pixels"])
+            points.append(sample["point"].tolist() if sum(sample["point"]) != 0 else None)
+            datetimes.append(datetime.fromtimestamp(sample["timestamp"].item()) if sample["timestamp"] else None)
+            training_labels.append(sample["label"].item())
 
-    embeddings = await get_embeddings_with_images(images=Images(images=training_images))
-    model, _ = train_classification(embeddings=np.array(embeddings.embeddings), labels=np.array(training_labels))
+    embeddings = get_embeddings_img(
+        gsd=gsd,
+        bands=bands,
+        pixels=pixels,
+        platform=platform,
+        wavelengths=None,
+        points=points,
+        datetimes=datetimes,
+    )
+
+    model, _ = train_classification(embeddings=embeddings, labels=np.array(training_labels))
 
     local_model_path = config.CACHE_DIR / uuid.uuid4().hex
     with open(local_model_path, "wb") as f:
