@@ -14,15 +14,16 @@ class Config(BaseSettings):
     SUPABASE_REQUESTS_TABLE: str = "requests"
     SUPABASE_IP_DATA_TABLE: str = "ip_data"
     SUPABASE_FILES_METADATA_TABLE: str = "files_metadata"
+    SUPABASE_MODELS_METADATA_TABLE: str = "models_metadata"
     SUPABASE_TRAINING_JOBS_TABLE: str = "training_jobs"
-    SUPABASE_MODEL_BUCKET: str = "models"
+    SUPABASE_MODELS_BUCKET: str = "models"
     SUPABASE_FILES_BUCKET: str = "files"
-    FILES_CACHE_DIR: Path = Path(".cache/")
+    CACHE_DIR: Path = Path(".cache/")
     CHECKPOINTS_DIR: Path = Path("checkpoints/")
 
 
 config = Config()
-config.FILES_CACHE_DIR.mkdir(exist_ok=True)
+config.CACHE_DIR.mkdir(exist_ok=True)
 
 supabase: Client = create_client(
     config.SUPABASE_URL,
