@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from typing import Literal
 
 import h5py
@@ -7,7 +8,7 @@ import numpy as np
 from app.schemas.clay import ClassificationTrainingDataSample, SegmentationTrainingDataSample
 
 
-def validate_hdf5(file_path: str, task: Literal["classification", "segmentation"]):
+def validate_hdf5(file_path: Path, task: Literal["classification", "segmentation"]):
     with h5py.File(file_path, "r") as f:
 
         if "data" not in f:
