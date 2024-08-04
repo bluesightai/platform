@@ -22,10 +22,10 @@ router = APIRouter(route_class=LoggingRoute)
 async def run_trained_model_inference(data: InferenceData) -> SegmentationLabels | ClassificationLabels:
     """Run inference of previously trained classification model on your data."""
 
-    model_path = config.FILES_CACHE_DIR / data.model
+    model_path = config.CACHE_DIR / data.model
     if not model_path.exists():
         with open(model_path, "wb") as f:
-            f.write(supabase.storage.from_(config.SUPABASE_MODEL_BUCKET).download(path=data.model))
+            f.write(supabase.storage.from_(config.SUPABASE_MODELS_BUCKET).download(path=data.model))
 
     if "classification" in data.model:
         with open(model_path, "rb") as f:
