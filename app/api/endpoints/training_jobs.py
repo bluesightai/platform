@@ -178,7 +178,6 @@ async def train_segmentation_model(
     model = SegmentorTraining(
         num_classes=num_classes,
         feature_maps=[3, 5, 7, 11],
-        ckpt_path="checkpoints/clay-v1-base.ckpt",
         lr=1e-5,
         wd=0.05,
         b1=0.9,

@@ -231,17 +231,7 @@ class SegmentEncoder(Encoder):
     """
 
     def __init__(  # noqa: PLR0913
-        self,
-        mask_ratio,
-        patch_size,
-        shuffle,
-        dim,
-        depth,
-        heads,
-        dim_head,
-        mlp_ratio,
-        feature_maps,
-        ckpt_path=None,
+        self, mask_ratio, patch_size, shuffle, dim, depth, heads, dim_head, mlp_ratio, feature_maps
     ):
         super().__init__(
             mask_ratio,
@@ -373,7 +363,7 @@ class Segmentor(nn.Module):
         ckpt_path (str): Path to the checkpoint file.
     """
 
-    def __init__(self, num_classes, feature_maps, ckpt_path):
+    def __init__(self, num_classes, feature_maps):
         super().__init__()
         # Default values are for the clay mae base model.
         self.encoder = SegmentEncoder(
@@ -386,7 +376,6 @@ class Segmentor(nn.Module):
             dim_head=64,
             mlp_ratio=4.0,
             feature_maps=feature_maps,
-            ckpt_path=ckpt_path,
         )
         self.upsamples = [nn.Upsample(scale_factor=2**i) for i in range(4)] + [
             nn.Upsample(scale_factor=4),

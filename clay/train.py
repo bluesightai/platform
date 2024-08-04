@@ -325,14 +325,10 @@ class SegmentorTraining(L.LightningModule):
         lr (float): Learning rate.
     """
 
-    def __init__(self, num_classes, feature_maps, ckpt_path, lr, wd, b1, b2):  # # noqa: PLR0913
+    def __init__(self, num_classes, feature_maps, lr, wd, b1, b2):  # # noqa: PLR0913
         super().__init__()
         self.save_hyperparameters()  # Save hyperparameters for checkpointing
-        self.model = Segmentor(
-            num_classes=num_classes,
-            feature_maps=feature_maps,
-            ckpt_path=ckpt_path,
-        )
+        self.model = Segmentor(num_classes=num_classes, feature_maps=feature_maps)
 
         self.loss_fn = smp.losses.FocalLoss(mode="multiclass")
         self.iou = MulticlassJaccardIndex(
