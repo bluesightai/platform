@@ -1,8 +1,9 @@
 import asyncio
-import shutil
+import pickle
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import h5py
 import lightning as L
@@ -16,15 +17,15 @@ from supabase.client import AsyncClient
 
 from app.api.deps import SessionDep
 from app.api.endpoints.embeddings import get_embeddings_with_images
-from app.config import config, supabase
+from app.api.endpoints.models import upload_model
+from app.config import config
 from app.crud.training_job import crud_training_job
-from app.schemas.clay import ClassificationTrainingDataSample, Image, Images
+from app.schemas.clay import Image, Images
 from app.schemas.training_job import TrainingJob, TrainingJobCreate, TrainingJobUpdate
 from app.utils.logging import LoggingRoute
-from app.utils.misc import random_string
 from app.utils.requests import download_file_from_bucket
 from app.utils.validation import validate_hdf5
-from clay.train import SegmentationDataModule, SegmentationDataset, SegmentorTraining, train_classification
+from clay.train import SegmentationDataModule, SegmentorTraining, train_classification
 
 router = APIRouter(route_class=LoggingRoute)
 
@@ -60,10 +61,10 @@ async def cancel_training_job(training_job_id: str, session: SessionDep) -> Trai
 
 
 async def execute_training_job(training_job: TrainingJob, session: AsyncClient):
-    logger.info(f"Starting training job {training_job.id}")
+    logger.debug(f"Starting training job {training_job.id}")
     try:
 
-        logger.info(f"Downloading files for training job {training_job.id}")
+        logger.debug(f"Downloading files for training job {training_job.id}")
         await crud_training_job.update(
             db=session, id=training_job.id, obj_in=TrainingJobUpdate(status="downloading_files")
         )
@@ -74,7 +75,7 @@ async def execute_training_job(training_job: TrainingJob, session: AsyncClient):
                 session=session, file_id=training_job.validation_file
             )
 
-        logger.info(f"Validating training file {training_file_path} and validation file {validation_file_path}")
+        logger.debug(f"Validating training file {training_file_path} and validation file {validation_file_path}")
         await crud_training_job.update(
             db=session, id=training_job.id, obj_in=TrainingJobUpdate(status="validating_files")
         )
@@ -82,24 +83,24 @@ async def execute_training_job(training_job: TrainingJob, session: AsyncClient):
         if validation_file_path:
             validate_hdf5(file_path=validation_file_path, task=training_job.task)
 
-        logger.info(f"Training job {training_job.id} is running!")
+        logger.debug(f"Training job {training_job.id} is running!")
         await crud_training_job.update(db=session, id=training_job.id, obj_in=TrainingJobUpdate(status="running"))
-
-        model_name = ""
+        local_model_path = Path()
         if training_job.task == "classification":
-            model_name, local_model_path = await train_classification_model(training_file_path, validation_file_path)
+            local_model_path = await train_classification_model(training_file_path, validation_file_path)
         elif training_job.task == "segmentation":
-            model_name, local_model_path = await train_segmentation_model(training_file_path, validation_file_path)
+            local_model_path = await train_segmentation_model(training_file_path, validation_file_path)
 
-        logger.info(f"Training job {training_job.id} is finished!")
-        # Upload model metadata, upload model file via /models endpoint
+        logger.debug(f"Uploading model for training job {training_job.id} to storage")
+        model_metadata = await upload_model(session=session, task=training_job.task, local_model_path=local_model_path)
 
+        logger.debug(f"Training job {training_job.id} succeeded! Model ID: {model_metadata.id}")
         await crud_training_job.update(
             db=session,
             id=training_job.id,
             obj_in=TrainingJobUpdate(
                 status="succeeded",
-                trained_model=model_name,
+                trained_model=model_metadata.id,
                 finished_at=datetime.now(timezone.utc).timestamp(),
             ),
         )
