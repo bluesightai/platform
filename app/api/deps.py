@@ -14,7 +14,7 @@ async def init_super_client() -> None:
     super_client = await acreate_client(
         config.SUPABASE_URL,
         config.SUPABASE_KEY,
-        options=ClientOptions(postgrest_client_timeout=10, storage_client_timeout=10),
+        options=ClientOptions(postgrest_client_timeout=10**9, storage_client_timeout=10**9),
     )
 
 
