@@ -1,4 +1,5 @@
 import os
+from typing import Literal
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
@@ -13,9 +14,9 @@ router = APIRouter(route_class=LoggingRoute)
 
 @router.post("", include_in_schema=False)
 async def upload_model(
-    session: SessionDep, metadata: ModelMetadataCreate, file: UploadFile = File(...)
+    session: SessionDep, task: Literal["classification", "segmentation"], file: UploadFile = File(...)
 ) -> ModelMetadata:
-    model_metadata = await crud_model_metadata.create(db=session, obj_in=metadata)
+    model_metadata = await crud_model_metadata.create(db=session, obj_in=ModelMetadataCreate(task=task))
     try:
         local_model_path = config.CACHE_DIR / model_metadata.id
         with open(local_model_path, "wb") as f:
