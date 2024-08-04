@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Literal, Tuple
 
 from fastapi import APIRouter, HTTPException
+from loguru import logger
 
 from app.api.deps import SessionDep
 from app.config import config
@@ -36,6 +37,7 @@ async def upload_model(
 async def download_model(session: SessionDep, model_id: str) -> Tuple[ModelMetadata, Path]:
     local_model_path = config.CACHE_DIR / model_id
     if not local_model_path.exists():
+        logger.debug(f"Downloading model '{model_id}' from bucket")
         with open(local_model_path, "wb") as f:
             f.write(await session.storage.from_(config.SUPABASE_MODELS_BUCKET).download(path=model_id))
     return await retrieve_model_metadata(session, model_id), local_model_path
