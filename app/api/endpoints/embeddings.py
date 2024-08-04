@@ -3,6 +3,7 @@ from typing import List, Tuple
 
 from fastapi import APIRouter
 
+from app.api.deps import SessionDep
 from app.schemas.clay import Embeddings, Images, Points
 from app.utils.logging import LoggingRoute
 from clay.model import get_embedding, get_embeddings_img
@@ -12,7 +13,7 @@ router = APIRouter(route_class=LoggingRoute)
 
 
 @router.post("/img")
-async def get_embeddings_with_images(images: Images) -> Embeddings:
+async def get_embeddings_with_images(images: Images, session: SessionDep) -> Embeddings:
     """Get embeddings for a list of images."""
     pixels: List[List[List[List[float]]]] = []
     points: List[Tuple[float, float] | None] = []
@@ -51,7 +52,7 @@ async def get_embeddings_with_images(images: Images) -> Embeddings:
 
 
 @router.post("/loc")
-async def get_embeddings_with_coordinates(points: Points) -> Embeddings:
+async def get_embeddings_with_coordinates(points: Points, session: SessionDep) -> Embeddings:
     """Get embeddings for a list of points."""
     items = [get_catalog_items(lat=lat, lon=lon, start="2022-01-01") for lat, lon in points.points]
     stacks = [
