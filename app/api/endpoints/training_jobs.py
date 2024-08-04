@@ -19,7 +19,7 @@ from app.api.deps import SessionDep
 from app.api.endpoints.models import upload_model
 from app.config import config
 from app.crud.training_job import crud_training_job
-from app.schemas.training_job import TrainingJob, TrainingJobCreate, TrainingJobUpdate
+from app.schemas.training_job import Hyperparameters, TrainingJob, TrainingJobCreate, TrainingJobUpdate
 from app.utils.logging import LoggingRoute
 from app.utils.requests import download_file_from_bucket
 from app.utils.validation import validate_hdf5
@@ -86,9 +86,19 @@ async def execute_training_job(training_job: TrainingJob, session: AsyncClient):
         await crud_training_job.update(db=session, id=training_job.id, obj_in=TrainingJobUpdate(status="running"))
         local_model_path = Path()
         if training_job.task == "classification":
-            local_model_path = await train_classification_model(training_file_path, validation_file_path)
+            local_model_path = await train_classification_model(
+                training_file_path=training_file_path,
+                validation_file_path=validation_file_path,
+                hyperparameters=training_job.hyperparameters,
+            )
         elif training_job.task == "segmentation":
-            local_model_path = await train_segmentation_model(training_file_path, validation_file_path)
+            if not training_job.hyperparameters:
+                raise ValueError("Hyperparameters must be specified for segmentation task!")
+            local_model_path = await train_segmentation_model(
+                training_file_path=training_file_path,
+                validation_file_path=validation_file_path,
+                hyperparameters=training_job.hyperparameters,
+            )
 
         logger.debug(f"Uploading model for training job {training_job.id} to storage")
         model_metadata = await upload_model(session=session, task=training_job.task, local_model_path=local_model_path)
@@ -120,7 +130,7 @@ async def execute_training_job(training_job: TrainingJob, session: AsyncClient):
 async def train_classification_model(
     training_file_path: Path,
     validation_file_path: Path | None = None,
-    hyperparameters: Dict[str, Any] | None = None,
+    hyperparameters: Hyperparameters | None = None,
 ) -> Path:
 
     pixels: List[List[List[List[float]]]] = []
@@ -160,13 +170,15 @@ async def train_classification_model(
 
 
 async def train_segmentation_model(
+    hyperparameters: Hyperparameters,
     training_file_path: Path,
     validation_file_path: Path | None = None,
-    hyperparameters: Dict[str, Any] | None = None,
 ) -> Path:
 
-    # num_classes = len(np.unique(data.labels))
-    num_classes = 7
+    if not hyperparameters.num_classes:
+        raise ValueError("The number of classes must be specified in the hyperparameters for segmentation task!")
+
+    num_classes = hyperparameters.num_classes
     logger.info(f"Found {num_classes} unique classes!")
 
     data_module = SegmentationDataModule(

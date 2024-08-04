@@ -4,7 +4,8 @@ from pydantic import BaseModel
 
 
 class Hyperparameters(BaseModel):
-    pass
+    num_classes: Optional[int] = None
+    """The number of classes in the dataset. Specify only for segmentation task."""
 
 
 class TrainingJobCreate(BaseModel):
