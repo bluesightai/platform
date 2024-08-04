@@ -1,76 +1,57 @@
 import os
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app.config import config, supabase
-from app.schemas.clay import FileDeleted, FileObject
+from app.api.deps import SessionDep
+from app.config import config
+from app.crud.file_metadata import crud_file_metadata
+from app.schemas.file_metadata import FileMetadata, FileMetadataCreate, FileMetadataUpdate
 from app.utils.logging import LoggingRoute
-from app.utils.misc import random_string
 
 router = APIRouter(route_class=LoggingRoute)
 
 
 @router.post("")
-async def upload_file(file: UploadFile = File(...)) -> FileObject:
+async def upload_file(session: SessionDep, file: UploadFile = File(...)) -> FileMetadata:
+    file_metadata = await crud_file_metadata.create(db=session, obj_in=FileMetadataCreate(filename=file.filename))
+    try:
+        local_file_path = config.CACHE_DIR / file_metadata.id
+        with open(local_file_path, "wb") as f:
+            while content := await file.read(10 * 2**20):  # Read in chunks of 10 MB
+                f.write(content)
 
-    file_id = f"file-{random_string()}"
-    temp_file_path = config.FILES_CACHE_DIR / file_id
+        with open(local_file_path, "rb") as f:
+            await session.storage.from_(config.SUPABASE_FILES_BUCKET).upload(path=file_metadata.id, file=f)
 
-    with open(temp_file_path, "wb") as temp_file:
-        while content := await file.read(10 * 2**20):  # Read in chunks of 10 MB
-            temp_file.write(content)
-
-    with open(temp_file_path, "rb") as temp_file:
-        supabase.storage.from_(config.SUPABASE_FILES_BUCKET).upload(path=file_id, file=temp_file)
-
-    created_at = datetime.now(timezone.utc)
-    metadata = {
-        "id": file_id,
-        "bytes": os.path.getsize(temp_file_path),
-        "created_at": created_at.isoformat(),
-        "filename": file.filename,
-    }
-    supabase.table(config.SUPABASE_FILES_METADATA_TABLE).insert(metadata).execute()
-
-    metadata["created_at"] = int(created_at.timestamp())
-
-    # os.remove(temp_file_path)
-
-    return FileObject(**metadata)
+        file_metadata = await crud_file_metadata.update(
+            db=session, id=file_metadata.id, obj_in=FileMetadataUpdate(bytes=os.path.getsize(local_file_path))
+        )
+        # local_file_path.unlink(missing_ok=True)
+    except Exception as e:
+        await crud_file_metadata.delete(db=session, id=file_metadata.id)
+        raise HTTPException(status_code=500, detail=f"Failed to upload file: {e.__class__.__name__} {e}")
+    return file_metadata
 
 
 @router.get("/{file_id}")
-async def retrieve_file(file_id: str) -> FileObject:
-
-    result = supabase.table(config.SUPABASE_FILES_METADATA_TABLE).select("*").eq("id", file_id).execute()
-
-    if not result.data:
+async def retrieve_file_metadata(session: SessionDep, file_id: str) -> FileMetadata:
+    file_metadata = await crud_file_metadata.get(db=session, id=file_id)
+    if not file_metadata:
         raise HTTPException(status_code=404, detail="File not found")
-
-    metadata = result.data[0]
-    metadata["created_at"] = int(datetime.fromisoformat(metadata["created_at"]).timestamp())
-
-    return FileObject(**metadata)
+    return file_metadata
 
 
 @router.delete("/{file_id}")
-async def delete_file(file_id: str) -> FileDeleted:
+async def delete_file(session: SessionDep, file_id: str) -> FileMetadata:
+    file_metadata = await retrieve_file_metadata(session, file_id)
 
-    result = supabase.table("files_metadata").select("*").eq("id", file_id).execute()
-    if not result.data:
-        raise HTTPException(status_code=404, detail="File not found")
-
-    cache_path = config.FILES_CACHE_DIR / file_id
-    cache_path.unlink(missing_ok=True)
+    local_file_path = config.CACHE_DIR / file_id
+    local_file_path.unlink(missing_ok=True)
 
     try:
-        supabase.storage.from_(config.SUPABASE_FILES_BUCKET).remove(file_id)
+        await session.storage.from_(config.SUPABASE_FILES_BUCKET).remove([file_id])
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Failed to delete file from storage")
+        raise HTTPException(status_code=500, detail=f"Failed to delete file from storage: {e.__class__.__name__} {e} ")
 
-    delete_result = supabase.table(config.SUPABASE_FILES_METADATA_TABLE).delete().eq("id", file_id).execute()
-    if not delete_result.data:
-        raise HTTPException(status_code=500, detail="Failed to delete file metadata")
-
-    return FileDeleted(id=file_id, deleted=True)
+    file_metadata = await crud_file_metadata.delete(db=session, id=file_id)
+    return file_metadata
