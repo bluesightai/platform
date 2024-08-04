@@ -3,9 +3,11 @@ from typing import Any, Dict
 
 import aiohttp
 import requests
-from async_lru import alru_cache
+from loguru import logger
+from supabase.client import AsyncClient
 
-# @alru_cache
+from app.config import config
+
 # async def fetch_ip_data(ip: str) -> Dict[str, Any]:
 #     url = f"http://ip-api.com/json/{ip}"
 #     async with aiohttp.ClientSession() as session:
@@ -18,7 +20,6 @@ from async_lru import alru_cache
 #     return data
 
 
-# @lru_cache()
 def fetch_ip_data(ip: str) -> Dict[str, Any]:
     url = f"http://ip-api.com/json/{ip}"
     response = requests.get(url)
@@ -26,7 +27,7 @@ def fetch_ip_data(ip: str) -> Dict[str, Any]:
         data = response.json()
     else:
         data = {"query": ip}
-        print(f"Request failed with status code: {response.status_code}")
+        logger.error(f"IP request failed with status code: {response.status_code} and response: {response.text}")
     return data
 
 
