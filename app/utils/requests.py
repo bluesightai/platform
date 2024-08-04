@@ -41,3 +41,13 @@ async def download_file_in_chunks(url: str, path: Path, chunk_size: int = 10 * 2
                     if not chunk:
                         break
                     f.write(chunk)
+
+
+async def download_file_from_bucket(session: AsyncClient, file_id: str) -> Path:
+
+    local_file_path = config.CACHE_DIR / file_id
+    if not local_file_path.exists():
+        logger.info(f"Downloading file {file_id} from bucket")
+        download_url = await session.storage.from_(config.SUPABASE_FILES_BUCKET).get_public_url(file_id)
+        await download_file_in_chunks(url=download_url, path=local_file_path)
+    return local_file_path
