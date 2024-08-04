@@ -122,11 +122,10 @@ async def train_classification_model(
     training_file_path: Path,
     validation_file_path: Path | None = None,
     hyperparameters: Dict[str, Any] | None = None,
-) -> str:
+) -> Path:
 
     training_images: List[Image] = []
     training_labels: List[int] = []
-
     with h5py.File(training_file_path, "r") as f:
         for sample in f["data"]:
 
@@ -143,16 +142,13 @@ async def train_classification_model(
             training_labels.append(label)
 
     embeddings = await get_embeddings_with_images(images=Images(images=training_images))
-
     model, _ = train_classification(embeddings=np.array(embeddings.embeddings), labels=np.array(training_labels))
 
-    model_name = f"model:classification-{random_string()}"
-    model_path = config.CACHE_DIR / model_name
-    with open(model_path, "wb") as f:
+    local_model_path = config.CACHE_DIR / uuid.uuid4().hex
+    with open(local_model_path, "wb") as f:
         pickle.dump(model, f)
-    supabase.storage.from_(config.SUPABASE_MODELS_BUCKET).upload(path=model_name, file=model_path)
 
-    return model_name
+    return local_model_path
 
 
 async def train_segmentation_model(
