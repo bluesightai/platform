@@ -1,7 +1,8 @@
 import os
-from typing import Literal
+from pathlib import Path
+from typing import Literal, Tuple
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, HTTPException
 
 from app.api.deps import SessionDep
 from app.config import config
@@ -12,23 +13,19 @@ from app.utils.logging import LoggingRoute
 router = APIRouter(route_class=LoggingRoute)
 
 
-@router.post("", include_in_schema=False)
 async def upload_model(
-    session: SessionDep, task: Literal["classification", "segmentation"], file: UploadFile = File(...)
+    session: SessionDep, task: Literal["classification", "segmentation"], local_model_path: Path
 ) -> ModelMetadata:
     model_metadata = await crud_model_metadata.create(db=session, obj_in=ModelMetadataCreate(task=task))
     try:
-        local_model_path = config.CACHE_DIR / model_metadata.id
-        with open(local_model_path, "wb") as f:
-            while content := await file.read(10 * 2**20):  # Read in chunks of 10 MB
-                f.write(content)
-
         with open(local_model_path, "rb") as f:
             await session.storage.from_(config.SUPABASE_MODELS_BUCKET).upload(path=model_metadata.id, file=f)
 
         model_metadata = await crud_model_metadata.update(
             db=session, id=model_metadata.id, obj_in=ModelMetadataUpdate(bytes=os.path.getsize(local_model_path))
         )
+
+        local_model_path = local_model_path.rename(config.CACHE_DIR / model_metadata.id)
         # local_model_path.unlink(missing_ok=True)
     except Exception as e:
         await crud_model_metadata.delete(db=session, id=model_metadata.id)
