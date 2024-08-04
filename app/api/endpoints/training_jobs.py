@@ -155,11 +155,7 @@ async def train_segmentation_model(
     training_file_path: Path,
     validation_file_path: Path | None = None,
     hyperparameters: Dict[str, Any] | None = None,
-) -> str:
-    """Train segmentation model on your data."""
-
-    # dataset = SegmentationDataset(file_path=training_file_path)
-    # print(dataset[0])
+) -> Path:
 
     # num_classes = len(np.unique(data.labels))
     num_classes = 7
@@ -168,7 +164,7 @@ async def train_segmentation_model(
     data_module = SegmentationDataModule(
         train_file_path=training_file_path,
         validation_file_path=validation_file_path,
-        batch_size=30,
+        batch_size=20,
         num_workers=0,
     )
 
@@ -181,11 +177,10 @@ async def train_segmentation_model(
         b2=0.95,
     )
 
-    model_name = f"model:segmentation-{random_string()}"
-    save_path = config.CHECKPOINTS_DIR / model_name
+    checkpoint_folder_path = config.CHECKPOINTS_DIR / uuid.uuid4().hex
     checkpoint_callback = ModelCheckpoint(
-        dirpath=save_path,
-        filename="7class-segment_epoch-{epoch:02d}_val-iou-{(val/iou if val/iou else train/iou):.4f}",
+        dirpath=checkpoint_folder_path,
+        filename=str(num_classes) + "class-segment_epoch-{epoch:02d}_val-iou-{(val/iou if val/iou else train/iou):.4f}",
         monitor="val/iou" if validation_file_path else "train/iou",
         mode="max",
         save_last=True,
@@ -205,7 +200,7 @@ async def train_segmentation_model(
         log_every_n_steps=5,
         max_epochs=10,
         accumulate_grad_batches=1,
-        default_root_dir="checkpoints/segment",
+        # default_root_dir="checkpoints/segment",
         fast_dev_run=False,
         num_sanity_val_steps=0,
         # logger=wandb_logger,
@@ -219,12 +214,6 @@ async def train_segmentation_model(
 
     trainer.fit(model, datamodule=data_module)
 
-    final_model_path = save_path / "last.ckpt"
-    cache_model_path = config.CACHE_DIR / model_name
-    # cp final_model_path cache_path
-    shutil.copy(final_model_path, cache_model_path)
+    local_model_path = checkpoint_folder_path / "last.ckpt"
 
-    with open(cache_model_path, "rb") as f:
-        response = supabase.storage.from_(config.SUPABASE_MODELS_BUCKET).upload(path=model_name, file=f)
-
-    return model_name
+    return local_model_path
