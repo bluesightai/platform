@@ -4,8 +4,10 @@ from typing import List, Tuple
 from fastapi import APIRouter
 
 from app.api.deps import SessionDep
-from app.schemas.clay import Embeddings, Images, Points
+from app.config import config
+from app.schemas.clay import Embeddings, EmbeddingsRequest, Images, Points
 from app.utils.logging import LoggingRoute
+from clay.clip import get_embeddings_from_images, get_embeddings_from_text, model
 from clay.model import get_embedding, get_embeddings_img
 from clay.utils import get_catalog_items, get_stack, stack_to_datacube
 
@@ -13,7 +15,7 @@ router = APIRouter(route_class=LoggingRoute)
 
 
 @router.post("/img")
-async def get_embeddings_with_images(images: Images, session: SessionDep) -> Embeddings:
+async def get_embeddings_with_images(images: EmbeddingsRequest, session: SessionDep) -> Embeddings:
     """Get embeddings for a list of images."""
     pixels: List[List[List[List[float]]]] = []
     points: List[Tuple[float, float] | None] = []
@@ -39,15 +41,21 @@ async def get_embeddings_with_images(images: Images, session: SessionDep) -> Emb
         points.append(image.point)
         datetimes.append(datetime.fromtimestamp(image.timestamp) if image.timestamp else None)
 
-    embeddings = get_embeddings_img(
-        gsd=images.images[0].gsd,
-        bands=images.images[0].bands,
-        pixels=pixels,
-        platform=images.images[0].platform,
-        wavelengths=images.images[0].wavelengths,
-        points=points,
-        datetimes=datetimes,
-    ).tolist()
+    if images.model == "clip":
+        embeddings = get_embeddings_from_images(images=pixels)
+    elif images.model == "clay":
+        embeddings = get_embeddings_img(
+            gsd=images.images[0].gsd,
+            bands=images.images[0].bands,
+            pixels=pixels,
+            platform=images.images[0].platform,
+            wavelengths=images.images[0].wavelengths,
+            points=points,
+            datetimes=datetimes,
+        ).tolist()
+    else:
+        raise ValueError("Invalid model")
+
     return Embeddings(embeddings=embeddings)
 
 
