@@ -61,3 +61,10 @@ async def get_embeddings_with_coordinates(points: Points, session: SessionDep) -
     ]
     datacubes = [stack_to_datacube(lat=lat, lon=lon, stack=stack) for stack, (lat, lon) in zip(stacks, points.points)]
     return Embeddings(embeddings=[get_embedding(datacube=datacube).tolist() for datacube in datacubes])
+
+
+@router.post("/text")
+async def get_embeddings_with_text(texts: list[str], session: SessionDep) -> Embeddings:
+    """Get embeddings for a list of texts."""
+    embeddings = get_embeddings_from_text(texts=texts)
+    return Embeddings(embeddings=embeddings)
