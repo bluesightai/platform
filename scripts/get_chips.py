@@ -15,6 +15,10 @@ from tqdm import tqdm
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# Optimize GDAL settings for cloud optimized reading
+os.environ["GDAL_DISABLE_READDIR_ON_OPEN"] = "EMPTY_DIR"
+os.environ["AWS_REQUEST_PAYER"] = "requester"
+
 
 # Connect to the Planetary Computer STAC API
 catalog = Client.open("https://earth-search.aws.element84.com/v1")
