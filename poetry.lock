@@ -1641,6 +1641,104 @@ test-full = ["adlfs", "aiohttp (!=4.0.0a0,!=4.0.0a1)", "cloudpickle", "dask", "d
 tqdm = ["tqdm"]
 
 [[package]]
+name = "ftfy"
+version = "6.2.3"
+description = "Fixes mojibake and other problems with Unicode, after the fact"
+optional = false
+python-versions = "<4,>=3.8.1"
+files = [
+    {file = "ftfy-6.2.3-py3-none-any.whl", hash = "sha256:f15761b023f3061a66207d33f0c0149ad40a8319fd16da91796363e2c049fdf8"},
+    {file = "ftfy-6.2.3.tar.gz", hash = "sha256:79b505988f29d577a58a9069afe75553a02a46e42de6091c0660cdc67812badc"},
+]
+
+[package.dependencies]
+wcwidth = ">=0.2.12,<0.3.0"
+
+[[package]]
+name = "geoarrow-c"
+version = "0.1.2"
+description = ""
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "geoarrow-c-0.1.2.tar.gz", hash = "sha256:73be8739c10c7c2261c54ddca77c977c71ee4285af4b3d812c12192bd1f46a24"},
+    {file = "geoarrow_c-0.1.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:e4bf2355867ee30615e3a0e47fd20685056c4146edafcc002853222584d14068"},
+    {file = "geoarrow_c-0.1.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:c65f1c12b4c95247b7f2e8edbdde06aa143734342e189010a93e8e39aa99adc2"},
+    {file = "geoarrow_c-0.1.2-cp310-cp310-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:e04bedbb29da7aac042221d05ed9a487a12859580443f246c6ce737f80e0a9cb"},
+    {file = "geoarrow_c-0.1.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:209cc44b81b21a6cdce9047fcf8f92cc8af1392ab70287bd23f3d4beadb22a03"},
+    {file = "geoarrow_c-0.1.2-cp310-cp310-musllinux_1_1_i686.whl", hash = "sha256:63d0b9a94ece726384ea90cedce50e8dd1282dc2978208f6e08b5afc00afa076"},
+    {file = "geoarrow_c-0.1.2-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:d5c8979afaa6e33805c8093210e8318b8df3436a8e0ebcc6ef7275f97253f830"},
+    {file = "geoarrow_c-0.1.2-cp310-cp310-win32.whl", hash = "sha256:52c561b7b82f7071a146d8bb84c944584f2c321cd19e17e4d0309e22d39e5706"},
+    {file = "geoarrow_c-0.1.2-cp310-cp310-win_amd64.whl", hash = "sha256:7a1f12643d6d0f5459d1f84a4834cd6c03088964fc568f63c594dde5fee8476f"},
+    {file = "geoarrow_c-0.1.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:11cb0fc6f87a15252c6cdb0c515043a032ed7d1fe93246613e10cc908e7e254d"},
+    {file = "geoarrow_c-0.1.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:05b3a7d5eb09b16a069aa44be2378591d05e2aa02a6157a667fc4e13a3b43d18"},
+    {file = "geoarrow_c-0.1.2-cp311-cp311-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:7a1bcae7c753eb714b731450c596f412494ae407cf141804b15ec08c2cfb6f9e"},
+    {file = "geoarrow_c-0.1.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:0f3f100646d32935fd6bf5c5ddc0a2aba8eefe19259c4ddb7af1f38370291247"},
+    {file = "geoarrow_c-0.1.2-cp311-cp311-musllinux_1_1_i686.whl", hash = "sha256:b8bea26e1be391baaa4b7ff3e8a68e39e0f05f6608722c829a26aa08caf5324a"},
+    {file = "geoarrow_c-0.1.2-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:257ab303c6672e8dc298abad9eca7f82a4497afcac4066e40ea66d1f071e182f"},
+    {file = "geoarrow_c-0.1.2-cp311-cp311-win32.whl", hash = "sha256:113a957705d82f0cea23c5d20c8afed40826d3b593bc3e3ff5fc4a97ad66be1e"},
+    {file = "geoarrow_c-0.1.2-cp311-cp311-win_amd64.whl", hash = "sha256:c4d4c94c763379e95e01757ecc84faae647774ece3beb6ea6018d00667362d14"},
+    {file = "geoarrow_c-0.1.2-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:89f55f0998db74a4cb00b1f91906cc08d8c3900bc1eadadfbd1cda9b9efda1e9"},
+    {file = "geoarrow_c-0.1.2-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:db4dba17af583d152617e4e7a3407e96612acaca01868fc8a7717110e83f398f"},
+    {file = "geoarrow_c-0.1.2-cp312-cp312-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:660d04fa0024686afc885400333ea9a8dc04d4790febfeb7419ff5a77b5c04d1"},
+    {file = "geoarrow_c-0.1.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c979c483be77170e11a00bb2fcd694d7775b85454b1d374af64b57189cd328ac"},
+    {file = "geoarrow_c-0.1.2-cp312-cp312-musllinux_1_1_i686.whl", hash = "sha256:6a6f611538ac5b9f6bc9eb90ac0eaf993b5687324fbe3c7b914c662170edbb39"},
+    {file = "geoarrow_c-0.1.2-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:c164dfdc73a81696c00f43d66b47775f6fc8d7e097c64d922ee2e8980cc57346"},
+    {file = "geoarrow_c-0.1.2-cp312-cp312-win32.whl", hash = "sha256:ddb792c42d37e22b6fd513ec2452db31680781a73b7143e2ac340ccad5fecf30"},
+    {file = "geoarrow_c-0.1.2-cp312-cp312-win_amd64.whl", hash = "sha256:0c9f45516d874086d5df2dbc3d859ae0679a9f633c1056774e78afdea20a965f"},
+    {file = "geoarrow_c-0.1.2-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:455ee405f0d5ac5d79b4773304a8fb3d5a725aef7c1356cfb91fb77db82b5c83"},
+    {file = "geoarrow_c-0.1.2-cp38-cp38-macosx_11_0_arm64.whl", hash = "sha256:0779fa03ae4322f47c2bc35a2eb886b708e9e9be3d95c5efcaedcfc4c1ef6b9a"},
+    {file = "geoarrow_c-0.1.2-cp38-cp38-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:8941de9b5d3cb05d4a5b9dc2e3c0f3b000db38f38bc0032a7816a1a99b191f2c"},
+    {file = "geoarrow_c-0.1.2-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d0632b34b9d2609eac2e1bd8356d061c11ed63c12d8ccd8e8b27d66fe97066ac"},
+    {file = "geoarrow_c-0.1.2-cp38-cp38-musllinux_1_1_i686.whl", hash = "sha256:2e69dfe7b6f5d52aadf5961d77d415d5cb819b740eb195097230d87cc7f2ed7e"},
+    {file = "geoarrow_c-0.1.2-cp38-cp38-musllinux_1_1_x86_64.whl", hash = "sha256:a4f258740874cf2674f0c74e8763d5cf2cdeeb71821ef7210e813c85783bf395"},
+    {file = "geoarrow_c-0.1.2-cp38-cp38-win32.whl", hash = "sha256:cc40b39113694bb86ad567c20de5b9a4a9deed9fc809e2d764f69d1426122c30"},
+    {file = "geoarrow_c-0.1.2-cp38-cp38-win_amd64.whl", hash = "sha256:c7c322801838f2799c07a0265c39bedbbaada41bdc84738332699c68c8ebae3f"},
+    {file = "geoarrow_c-0.1.2-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:79c07cf4d649253128d023d62f11846d5a2248a0621a99a5f8b72e080d32558e"},
+    {file = "geoarrow_c-0.1.2-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:a376a3b79e6b3b256c423c572ed18108af58c42d83ee6d3a6a81bfa4ab31798c"},
+    {file = "geoarrow_c-0.1.2-cp39-cp39-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:5d807e8a7b7e892c0aaa5473711d2313606a782bb0a03d9de2dc1935c94102c6"},
+    {file = "geoarrow_c-0.1.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a9f4c1e4694a01dca0b996b5e4268f30f194d52e42a7988e666db77b310e89b0"},
+    {file = "geoarrow_c-0.1.2-cp39-cp39-musllinux_1_1_i686.whl", hash = "sha256:630779db727a0de9132b343104837770a4eee14d1ac8292981170a2151c0dc28"},
+    {file = "geoarrow_c-0.1.2-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:7292bfccef4bfaa4347e235aa55e4729d32351819cc10a2e42101c01b28ba2fc"},
+    {file = "geoarrow_c-0.1.2-cp39-cp39-win32.whl", hash = "sha256:f6c565e6676750b025afffa7382f0d61d0c1679871ad0ca4346ff1944a4995f7"},
+    {file = "geoarrow_c-0.1.2-cp39-cp39-win_amd64.whl", hash = "sha256:22a17738d37ac04888cc4e47a06cb2719bda137b5d691e2de0c37ff588a87691"},
+    {file = "geoarrow_c-0.1.2-pp310-pypy310_pp73-macosx_10_9_x86_64.whl", hash = "sha256:86c90e5009ba00ab758497c93593fd88cdd5f21b8de7847966f0a7cd0d0422de"},
+    {file = "geoarrow_c-0.1.2-pp310-pypy310_pp73-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:3bc28c938516296708506572c77d59910aa6700d2a4691dd90f6c71698cdcf46"},
+    {file = "geoarrow_c-0.1.2-pp310-pypy310_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:c0e29e789865ebcf8b44dc828b0a27917772f54ea076b1633a041da66eb9425c"},
+    {file = "geoarrow_c-0.1.2-pp310-pypy310_pp73-win_amd64.whl", hash = "sha256:4efe8e7e2879bcf0180a38dd0fb0dd617da32fbfd569bd711477595da1426bb0"},
+    {file = "geoarrow_c-0.1.2-pp38-pypy38_pp73-macosx_10_9_x86_64.whl", hash = "sha256:0dfe38ea77ed3c3a32df39d1d5948f7e1aaf31e5f43fb716ce8836894b34f06d"},
+    {file = "geoarrow_c-0.1.2-pp38-pypy38_pp73-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:3a2dbfc190bbd84df8a259c7adda70ad06e0a7ae4194602775d769d2c621c75e"},
+    {file = "geoarrow_c-0.1.2-pp38-pypy38_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:e5193301ad22656f6d1b7ed8569fa6c410acc8c8742a7f7953fccfaa13e2db47"},
+    {file = "geoarrow_c-0.1.2-pp38-pypy38_pp73-win_amd64.whl", hash = "sha256:39cab481aea4adaa423d7b13f0616f54f16640a0fa1f528ecdfebc3278de7bbe"},
+    {file = "geoarrow_c-0.1.2-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:524d1937d88b9751044649458f5a2d116deb73655c9607748c858f8cfcf65eae"},
+    {file = "geoarrow_c-0.1.2-pp39-pypy39_pp73-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:3e8185af88bbf852f8de43f10c3fbfbf37e0a80b238770f224adbf4d427bfd71"},
+    {file = "geoarrow_c-0.1.2-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d9a93d1b348aea2177989c346476fdd9476cde380309ece10909ace3fceb0162"},
+    {file = "geoarrow_c-0.1.2-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:10973c80c774f22d598eb034930452355a272abe1fdf011fec05c0db63922a21"},
+]
+
+[package.extras]
+test = ["numpy", "pyarrow", "pytest"]
+
+[[package]]
+name = "geoarrow-pyarrow"
+version = "0.1.2"
+description = ""
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "geoarrow-pyarrow-0.1.2.tar.gz", hash = "sha256:318b3bd42e865b7b2cd7bcb0947c4053f07be15296153c297e94150a4be7357e"},
+    {file = "geoarrow_pyarrow-0.1.2-py3-none-any.whl", hash = "sha256:c0be5545374fde7ded77f5aef2013cf1ab0e9001cbe4e3b489f55530c6f12c45"},
+]
+
+[package.dependencies]
+geoarrow-c = "*"
+pyarrow = "*"
+pyarrow-hotfix = "*"
+
+[package.extras]
+test = ["geopandas", "numpy", "pandas", "pyogrio", "pyproj", "pytest"]
+
+[[package]]
 name = "geopandas"
 version = "1.0.1"
 description = "Geographic pandas extensions"
@@ -3887,6 +3985,30 @@ protobuf = ">=3.20.2"
 reference = ["google-re2", "pillow"]
 
 [[package]]
+name = "open-clip-torch"
+version = "2.26.1"
+description = "Open reproduction of consastive language-image pretraining (CLIP) and related."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "open_clip_torch-2.26.1-py3-none-any.whl", hash = "sha256:cf87a0cc59ef2016f570530eb369ffe4b5de0eff59735b066ed15bd03e74a126"},
+    {file = "open_clip_torch-2.26.1.tar.gz", hash = "sha256:07c2a8e15938171b27ef96ad8648a89a2a7c1e38bfd24a4abb235b8db02cb469"},
+]
+
+[package.dependencies]
+ftfy = "*"
+huggingface-hub = "*"
+regex = "*"
+timm = "*"
+torch = ">=1.9.0"
+torchvision = "*"
+tqdm = "*"
+
+[package.extras]
+test = ["open_clip_torch[training]", "pytest", "pytest-split"]
+training = ["fsspec", "pandas", "timm (>=1.0.7)", "torch (>=2.0)", "transformers[sentencepiece]", "webdataset (>=0.2.5)"]
+
+[[package]]
 name = "opencv-python"
 version = "4.10.0.84"
 description = "Wrapper package for OpenCV python bindings."
@@ -4192,6 +4314,32 @@ mic = ["olefile"]
 tests = ["check-manifest", "coverage", "defusedxml", "markdown2", "olefile", "packaging", "pyroma", "pytest", "pytest-cov", "pytest-timeout"]
 typing = ["typing-extensions"]
 xmp = ["defusedxml"]
+
+[[package]]
+name = "planetary-computer"
+version = "1.0.0"
+description = "Planetary Computer SDK for Python"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "planetary-computer-1.0.0.tar.gz", hash = "sha256:5958a8e1d8ba1aafc7ac45878df2d7d03405806ae31ed2e675333faebca960cc"},
+    {file = "planetary_computer-1.0.0-py3-none-any.whl", hash = "sha256:7af5839f9346c1d23d53fff4e80e955db18a2d81992877816e22dcbc2f90c40d"},
+]
+
+[package.dependencies]
+click = ">=7.1"
+packaging = "*"
+pydantic = ">=1.7.3"
+pystac = ">=1.0.0"
+pystac-client = ">=0.2.0"
+python-dotenv = "*"
+pytz = ">=2020.5"
+requests = ">=2.25.1"
+
+[package.extras]
+adlfs = ["adlfs"]
+azure = ["azure-storage-blob"]
+dev = ["black", "flake8", "mypy", "pytest", "responses", "setuptools", "types-requests"]
 
 [[package]]
 name = "platformdirs"
@@ -4517,6 +4665,17 @@ numpy = ">=1.16.6"
 
 [package.extras]
 test = ["cffi", "hypothesis", "pandas", "pytest", "pytz"]
+
+[[package]]
+name = "pyarrow-hotfix"
+version = "0.6"
+description = ""
+optional = false
+python-versions = ">=3.5"
+files = [
+    {file = "pyarrow_hotfix-0.6-py3-none-any.whl", hash = "sha256:dcc9ae2d220dff0083be6a9aa8e0cdee5182ad358d4931fce825c545e5c89178"},
+    {file = "pyarrow_hotfix-0.6.tar.gz", hash = "sha256:79d3e030f7ff890d408a100ac16d6f00b14d44a502d7897cd9fc3e3a534e9945"},
+]
 
 [[package]]
 name = "pyasn1"
@@ -5676,6 +5835,26 @@ pygments = ">=2.13.0,<3.0.0"
 jupyter = ["ipywidgets (>=7.5.1,<9)"]
 
 [[package]]
+name = "rio-stac"
+version = "0.9.0"
+description = "Create STAC Items from raster datasets."
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "rio_stac-0.9.0-py3-none-any.whl", hash = "sha256:807f6fcb18d0934d3616838269586a3b89df13c32fbd70578d09bd8dea47ae7e"},
+    {file = "rio_stac-0.9.0.tar.gz", hash = "sha256:c6760e0f3eb6b51b8bd827fd708da757e8231b036cdf0d2fdfbef0fe76ce3a68"},
+]
+
+[package.dependencies]
+pystac = ">=1.0.0,<2.0.0"
+rasterio = "*"
+
+[package.extras]
+dev = ["pre-commit"]
+doc = ["mkdocs", "mkdocs-jupyter", "mkdocs-material", "pdocs", "pygments"]
+test = ["pystac[validation] (>=1.0.0,<2.0.0)", "pytest", "pytest-cov", "requests"]
+
+[[package]]
 name = "rioxarray"
 version = "0.15.7"
 description = "geospatial xarray extension powered by rasterio"
@@ -6420,6 +6599,33 @@ files = [
     {file = "soupsieve-2.5-py3-none-any.whl", hash = "sha256:eaa337ff55a1579b6549dc679565eac1e3d000563bcb1c8ab0d0fefbc0c2cdc7"},
     {file = "soupsieve-2.5.tar.gz", hash = "sha256:5663d5a7b3bfaeee0bc4372e7fc48f9cff4940b3eec54a6451cc5299f1097690"},
 ]
+
+[[package]]
+name = "stacchip"
+version = "0.1.38"
+description = "Dynamically create image chips from STAC items"
+optional = false
+python-versions = ">=3.10"
+files = [
+    {file = "stacchip-0.1.38-py3-none-any.whl", hash = "sha256:e44f70f265190426e38ecd42fc9fd99a521f514624de0621623d17ee772118ea"},
+    {file = "stacchip-0.1.38.tar.gz", hash = "sha256:267c372ac84c237fa68b5a3e937fad85e1a50aea51ce2a2c8f8b1681c2c032dc"},
+]
+
+[package.dependencies]
+boto3 = ">=1.29.0"
+geoarrow-pyarrow = ">=0.1.2"
+geopandas = ">=0.14.1"
+numpy = ">=1.26.0,<2.0"
+planetary-computer = ">=1.0.0"
+pyarrow = ">=14.0.1"
+pystac = ">=1.9.0"
+pystac-client = ">=0.7.5"
+rasterio = ">=1.3.9"
+rio-stac = ">=0.9.0"
+
+[package.extras]
+dev = ["build", "mock", "pytest", "ruff", "types-python-dateutil"]
+docs = ["mkdocs", "mkdocs-jupyter", "mkdocs-material", "nbconvert", "pdocs", "pygments"]
 
 [[package]]
 name = "stack-data"
@@ -7820,4 +8026,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.13"
-content-hash = "7817d873e826c7001453c0c010cee5257f84141eac6af007d09ca7a1d2d7da29"
+content-hash = "e3c18ab3d7421daf95df8fa47de1775176ba24f952dfabec866444be40193838"

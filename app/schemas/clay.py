@@ -103,6 +103,10 @@ class Images(BaseModel):
     )
 
 
+class EmbeddingsRequest(Images):
+    model: Literal["clay", "clip"] = Field(default="clay", description="Model to use for embeddings generation")
+
+
 class Embeddings(BaseModel):
     embeddings: List[List[float]] = Field(
         examples=[[[228.0, 322.1], [234.0, 231.5]]], description="Embedding representing an area"
