@@ -14,8 +14,10 @@ import json
 from tqdm import tqdm
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
 # Connect to the Planetary Computer STAC API
-catalog = Client.open("https://planetarycomputer.microsoft.com/api/stac/v1")
+catalog = Client.open("https://earth-search.aws.element84.com/v1")
 
 # Define your area of interest
 aoi = {
@@ -32,13 +34,10 @@ aoi = {
 }
 
 # Search for NAIP imagery
-search = catalog.search(filter_lang="cql2-json", filter={
-    "op": "and",
-    "args": [
-        {"op": "s_intersects", "args": [{"property": "geometry"}, aoi]},
-        {"op": "=", "args": [{"property": "collection"}, "naip"]}
-    ]
-})
+search = catalog.search(
+    collections=["naip"],  # Specify the collection
+    intersects=aoi  # Use the intersects parameter for spatial search
+)
 
 
 
