@@ -11,6 +11,7 @@ import numpy as np
 import math
 from pyproj import Transformer
 import json
+from tqdm import tqdm
 
 # Connect to the Planetary Computer STAC API
 catalog = Client.open("https://planetarycomputer.microsoft.com/api/stac/v1")
@@ -102,6 +103,7 @@ def process_chip(src, x, y, chip_id, chip_size, output_dir):
         'image_data': chip_data
     }
 
+
 def process_image(item, output_dir):
     signed_item = pc.sign(item)
     
@@ -119,28 +121,32 @@ def process_image(item, output_dir):
         transformer = Transformer.from_crs(src.crs, "EPSG:4326", always_xy=True)
 
         num_chips_x, num_chips_y = math.ceil(width / 224), math.ceil(height / 224)
-        for y in range(num_chips_y):
-            for x in range(num_chips_x):
-                start_x, start_y = x * 224, y * 224
-                current_chip_size = min(224, width - start_x, height - start_y)
+        total_chips = num_chips_x * num_chips_y
+        
+        with tqdm(total=total_chips, desc=f"Processing chips for {signed_item.id}", unit="chip") as pbar:
+            for y in range(num_chips_y):
+                for x in range(num_chips_x):
+                    start_x, start_y = x * 224, y * 224
+                    current_chip_size = min(224, width - start_x, height - start_y)
 
-                if current_chip_size > 0:
-                    chip_data = process_chip(src, start_x, start_y, len(processed_items), current_chip_size, chips_dir)
-                    
-                    center_x, center_y = start_x + current_chip_size / 2, start_y + current_chip_size / 2
-                    center_x_proj, center_y_proj = src.xy(center_y, center_x)
-                    lon, lat = transformer.transform(center_x_proj, center_y_proj)
-                    
-                    chip_data.update({
-                        'center_lat': lat,
-                        'center_lon': lon,
-                        'image_id': signed_item.id,
-                        'embedding': get_embedding(chip_data['image_data'])
-                    })
-                    
-                    del chip_data['image_data']  # Remove image data to save memory
-                    processed_items.append(chip_data)
-                    print(f"Processed chip {len(processed_items)}, embedding length: {len(chip_data['embedding'])}")
+                    if current_chip_size > 0:
+                        chip_data = process_chip(src, start_x, start_y, len(processed_items), current_chip_size, chips_dir)
+                        
+                        center_x, center_y = start_x + current_chip_size / 2, start_y + current_chip_size / 2
+                        center_x_proj, center_y_proj = src.xy(center_y, center_x)
+                        lon, lat = transformer.transform(center_x_proj, center_y_proj)
+                        
+                        chip_data.update({
+                            'center_lat': lat,
+                            'center_lon': lon,
+                            'image_id': signed_item.id,
+                            'embedding': get_embedding(chip_data['image_data'])
+                        })
+                        
+                        del chip_data['image_data']  # Remove image data to save memory
+                        processed_items.append(chip_data)
+                        pbar.update(1)
+                        pbar.set_postfix({"Last chip": len(processed_items)})
 
     print(f"Processed {len(processed_items)} chips from image {signed_item.id}")
     
@@ -168,6 +174,17 @@ def process_image(item, output_dir):
 output_dir = 'image_chips'
 os.makedirs(output_dir, exist_ok=True)
 
-total_chips = sum(process_image(item, output_dir) for item in search.items())
+# Get the total number of images
+total_images = sum(1 for _ in search.items())
 
-print(f"Processed a total of {total_chips} chips across all images.")
+total_chips = 0
+with tqdm(search.items(), total=total_images, desc="Processing images", unit="image") as pbar:
+    for i, item in enumerate(pbar):
+        if i >= 2:  # Process only 2 images
+            break
+        chips_processed = process_image(item, output_dir)
+        total_chips += chips_processed
+        pbar.set_postfix({"Total chips": total_chips, "Last image chips": chips_processed})
+
+print(f"Processed a total of {total_chips} chips across 2 images.")
+
