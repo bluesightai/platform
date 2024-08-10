@@ -39,6 +39,10 @@ search = catalog.search(filter_lang="cql2-json", filter={
     ]
 })
 
+
+
+BATCH_SIZE = 100
+
 def ensure_rgb(image):
     """Ensure the image is RGB."""
     if image.shape[0] == 4:  # If RGBA, drop the alpha channel
@@ -54,8 +58,8 @@ def resize_image(image, target_size=(224, 224)):
         image = np.array(image).transpose(2, 0, 1)
     return image
 
-def get_embedding(image, gsd=0.6):
-    """Get embedding for an image using the bluesight.ai API."""
+def get_embeddings_batch(images, gsd=0.6):
+    """Get embeddings for a batch of images using the bluesight.ai API."""
     url = "https://api.bluesight.ai/embeddings/img"
     
     payload = {
@@ -66,6 +70,7 @@ def get_embedding(image, gsd=0.6):
                 "bands": ["red", "green", "blue"],
                 "pixels": image.tolist()
             }
+            for image in images
         ]
     }
     headers = {"Content-Type": "application/json"}
@@ -73,10 +78,10 @@ def get_embedding(image, gsd=0.6):
     response = requests.post(url, json=payload, headers=headers)
     
     if response.status_code == 200:
-        return json.loads(response.text)['embeddings'][0]
+        return json.loads(response.text)['embeddings']
     else:
-        print(f"Error getting embedding: {response.text}")
-        return None
+        print(f"Error getting embeddings: {response.text}")
+        return [None] * len(images)
 
 def process_chip(src, x, y, chip_id, chip_size, output_dir):
     window = rasterio.windows.Window(x, y, chip_size, chip_size)
@@ -103,7 +108,6 @@ def process_chip(src, x, y, chip_id, chip_size, output_dir):
         'image_data': chip_data
     }
 
-
 def process_image(item, output_dir):
     signed_item = pc.sign(item)
     
@@ -115,6 +119,7 @@ def process_image(item, output_dir):
     os.makedirs(chips_dir, exist_ok=True)
     
     processed_items = []
+    batch_images = []
     
     with rasterio.open(signed_item.assets['image'].href) as src:
         height, width = src.height, src.width
@@ -140,13 +145,26 @@ def process_image(item, output_dir):
                             'center_lat': lat,
                             'center_lon': lon,
                             'image_id': signed_item.id,
-                            'embedding': get_embedding(chip_data['image_data'])
                         })
                         
+                        batch_images.append(chip_data['image_data'])
                         del chip_data['image_data']  # Remove image data to save memory
                         processed_items.append(chip_data)
+                        
+                        if len(batch_images) == BATCH_SIZE:
+                            embeddings = get_embeddings_batch(batch_images)
+                            for item, embedding in zip(processed_items[-BATCH_SIZE:], embeddings):
+                                item['embedding'] = embedding
+                            batch_images = []
+                        
                         pbar.update(1)
                         pbar.set_postfix({"Last chip": len(processed_items)})
+
+    # Process any remaining images in the batch
+    if batch_images:
+        embeddings = get_embeddings_batch(batch_images)
+        for item, embedding in zip(processed_items[-len(batch_images):], embeddings):
+            item['embedding'] = embedding
 
     print(f"Processed {len(processed_items)} chips from image {signed_item.id}")
     
@@ -187,4 +205,3 @@ with tqdm(search.items(), total=total_images, desc="Processing images", unit="im
         pbar.set_postfix({"Total chips": total_chips, "Last image chips": chips_processed})
 
 print(f"Processed a total of {total_chips} chips across 2 images.")
-
