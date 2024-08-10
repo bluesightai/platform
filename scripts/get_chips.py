@@ -12,7 +12,8 @@ import math
 from pyproj import Transformer
 import json
 from tqdm import tqdm
-
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 # Connect to the Planetary Computer STAC API
 catalog = Client.open("https://planetarycomputer.microsoft.com/api/stac/v1")
 
@@ -108,7 +109,8 @@ def process_chip(src, x, y, chip_id, chip_size, output_dir):
         'image_data': chip_data
     }
 
-def process_image(item, output_dir):
+
+def process_image(item, output_dir, parquet_dir):
     signed_item = pc.sign(item)
     
     print(f"Processing item: {signed_item.id}")
@@ -121,87 +123,122 @@ def process_image(item, output_dir):
     processed_items = []
     batch_images = []
     
-    with rasterio.open(signed_item.assets['image'].href) as src:
-        height, width = src.height, src.width
-        transformer = Transformer.from_crs(src.crs, "EPSG:4326", always_xy=True)
+    try:
+        with rasterio.open(signed_item.assets['image'].href) as src:
+            # # Print information about the channels
+            # print(f"Number of channels: {src.count}")
+            # print(f"Channel names: {src.descriptions}")
+            # print(f"Channel data types: {[dt for dt in src.dtypes]}")
+            # print("Note: NAIP imagery typically doesn't use colormaps.")
+            
+            height, width = src.height, src.width
+            transformer = Transformer.from_crs(src.crs, "EPSG:4326", always_xy=True)
 
-        num_chips_x, num_chips_y = math.ceil(width / 224), math.ceil(height / 224)
-        total_chips = num_chips_x * num_chips_y
+            num_chips_x, num_chips_y = math.ceil(width / 224), math.ceil(height / 224)
+            total_chips = num_chips_x * num_chips_y
+            
+            with tqdm(total=total_chips, desc=f"Processing chips for {signed_item.id}", unit="chip") as pbar:
+                for y in range(num_chips_y):
+                    for x in range(num_chips_x):
+                        start_x, start_y = x * 224, y * 224
+                        current_chip_size = min(224, width - start_x, height - start_y)
+
+                        if current_chip_size > 0:
+                            try:
+                                chip_data = process_chip(src, start_x, start_y, len(processed_items), current_chip_size, chips_dir)
+                                
+                                # Print information about the first chip
+                                if len(processed_items) == 0:
+                                    print(f"First chip shape: {chip_data['image_data'].shape}")
+                                    print(f"First chip data type: {chip_data['image_data'].dtype}")
+                                    print(f"Channel order when saving: RGB (Red: 0, Green: 1, Blue: 2)")
+                                
+                                center_x, center_y = start_x + current_chip_size / 2, start_y + current_chip_size / 2
+                                center_x_proj, center_y_proj = src.xy(center_y, center_x)
+                                lon, lat = transformer.transform(center_x_proj, center_y_proj)
+                                
+                                chip_data.update({
+                                    'center_lat': lat,
+                                    'center_lon': lon,
+                                    'image_id': signed_item.id,
+                                })
+                                
+                                batch_images.append(chip_data['image_data'])
+                                del chip_data['image_data']  # Remove image data to save memory
+                                processed_items.append(chip_data)
+                                
+                                if len(batch_images) == BATCH_SIZE:
+                                    embeddings = get_embeddings_batch(batch_images)
+                                    for item, embedding in zip(processed_items[-BATCH_SIZE:], embeddings):
+                                        item['embedding'] = embedding
+                                    batch_images = []
+                                
+                                pbar.update(1)
+                                pbar.set_postfix({"Last chip": len(processed_items)})
+                            except rasterio.errors.RasterioIOError as e:
+                                logging.error(f"Error processing chip at x={start_x}, y={start_y}: {str(e)}")
+                                continue  # Skip this chip and continue with the next one
+
+        # Process any remaining images in the batch
+        if batch_images:
+            embeddings = get_embeddings_batch(batch_images)
+            for item, embedding in zip(processed_items[-len(batch_images):], embeddings):
+                item['embedding'] = embedding
+
+        print(f"Processed {len(processed_items)} chips from image {signed_item.id}")
         
-        with tqdm(total=total_chips, desc=f"Processing chips for {signed_item.id}", unit="chip") as pbar:
-            for y in range(num_chips_y):
-                for x in range(num_chips_x):
-                    start_x, start_y = x * 224, y * 224
-                    current_chip_size = min(224, width - start_x, height - start_y)
-
-                    if current_chip_size > 0:
-                        chip_data = process_chip(src, start_x, start_y, len(processed_items), current_chip_size, chips_dir)
-                        
-                        center_x, center_y = start_x + current_chip_size / 2, start_y + current_chip_size / 2
-                        center_x_proj, center_y_proj = src.xy(center_y, center_x)
-                        lon, lat = transformer.transform(center_x_proj, center_y_proj)
-                        
-                        chip_data.update({
-                            'center_lat': lat,
-                            'center_lon': lon,
-                            'image_id': signed_item.id,
-                        })
-                        
-                        batch_images.append(chip_data['image_data'])
-                        del chip_data['image_data']  # Remove image data to save memory
-                        processed_items.append(chip_data)
-                        
-                        if len(batch_images) == BATCH_SIZE:
-                            embeddings = get_embeddings_batch(batch_images)
-                            for item, embedding in zip(processed_items[-BATCH_SIZE:], embeddings):
-                                item['embedding'] = embedding
-                            batch_images = []
-                        
-                        pbar.update(1)
-                        pbar.set_postfix({"Last chip": len(processed_items)})
-
-    # Process any remaining images in the batch
-    if batch_images:
-        embeddings = get_embeddings_batch(batch_images)
-        for item, embedding in zip(processed_items[-len(batch_images):], embeddings):
-            item['embedding'] = embedding
-
-    print(f"Processed {len(processed_items)} chips from image {signed_item.id}")
-    
-    # Create GeoDataFrame and save to parquet
-    gdf = gpd.GeoDataFrame(processed_items, crs=src.crs)
-    gdf_wgs84 = gdf.to_crs(epsg=4326)
-    
-    df = pd.DataFrame({
-        'embedding': gdf_wgs84['embedding'],
-        'chip_id': gdf_wgs84['chip_id'],
-        'file_path': gdf_wgs84['file_path'],
-        'image_id': gdf_wgs84['image_id'],
-        'geometry': gdf_wgs84['geometry'].apply(lambda geom: geom.wkb),
-        'center_lat': gdf_wgs84['center_lat'],
-        'center_lon': gdf_wgs84['center_lon']
-    })
-    
-    parquet_file = os.path.join(image_dir, f'{signed_item.id}_chips.parquet')
-    df.to_parquet(parquet_file, engine='pyarrow')
-    
-    print(f"Saved chip information to '{parquet_file}'")
-    return len(processed_items)
+        # Create GeoDataFrame and save to parquet
+        if processed_items:
+            gdf = gpd.GeoDataFrame(processed_items, crs=src.crs)
+            gdf_wgs84 = gdf.to_crs(epsg=4326)
+            
+            df = pd.DataFrame({
+                'embedding': gdf_wgs84['embedding'],
+                'chip_id': gdf_wgs84['chip_id'],
+                'file_path': gdf_wgs84['file_path'],
+                'image_id': gdf_wgs84['image_id'],
+                'geometry': gdf_wgs84['geometry'].apply(lambda geom: geom.wkb),
+                'center_lat': gdf_wgs84['center_lat'],
+                'center_lon': gdf_wgs84['center_lon']
+            })
+            
+            parquet_file = os.path.join(parquet_dir, f'{signed_item.id}_chips.parquet')
+            df.to_parquet(parquet_file, engine='pyarrow')
+            
+            print(f"Saved chip information to '{parquet_file}'")
+        else:
+            print(f"No chips were successfully processed for image {signed_item.id}")
+        
+        return len(processed_items)
+    except Exception as e:
+        logging.error(f"Error processing image {signed_item.id}: {str(e)}")
+        return 0
 
 # Main execution
 output_dir = 'image_chips'
+parquet_dir = 'parquet_files'
 os.makedirs(output_dir, exist_ok=True)
+os.makedirs(parquet_dir, exist_ok=True)
 
 # Get the total number of images
 total_images = sum(1 for _ in search.items())
 
 total_chips = 0
+errors = []
 with tqdm(search.items(), total=total_images, desc="Processing images", unit="image") as pbar:
     for i, item in enumerate(pbar):
-        if i >= 2:  # Process only 2 images
-            break
-        chips_processed = process_image(item, output_dir)
-        total_chips += chips_processed
-        pbar.set_postfix({"Total chips": total_chips, "Last image chips": chips_processed})
+        try:
+            chips_processed = process_image(item, output_dir, parquet_dir)
+            total_chips += chips_processed
+            print(f"Processed a total of {total_chips} chips across {i+1} images.")
 
-print(f"Processed a total of {total_chips} chips across 2 images.")
+            pbar.set_postfix({"Total chips": total_chips, "Last image chips": chips_processed})
+        except Exception as e:
+            error_msg = f"Error processing image {item.id}: {str(e)}"
+            logging.error(error_msg)
+            errors.append(error_msg)
+
+if errors:
+    print(f"Encountered {len(errors)} errors:")
+    for error in errors:
+        print(error)
