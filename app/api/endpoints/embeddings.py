@@ -4,10 +4,9 @@ from typing import List, Tuple
 from fastapi import APIRouter
 
 from app.api.deps import SessionDep
-from app.config import config
-from app.schemas.clay import Embeddings, EmbeddingsRequest, Images, Points
+from app.schemas.clay import Embeddings, EmbeddingsRequest, Points
 from app.utils.logging import LoggingRoute
-from clay.clip import get_embeddings_from_images, get_embeddings_from_text, model
+from clay.clip import get_embeddings_from_images, get_embeddings_from_text
 from clay.model import get_embedding, get_embeddings_img
 from clay.utils import get_catalog_items, get_stack, stack_to_datacube
 
