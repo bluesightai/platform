@@ -13,7 +13,7 @@ from app.api.deps import SessionDep
 from app.api.endpoints.embeddings import get_embeddings_with_images
 from app.api.endpoints.models import download_model
 from app.config import config
-from app.schemas.clay import ClassificationLabels, Images, InferenceData, SegmentationLabels
+from app.schemas.clay import ClassificationLabels, EmbeddingsRequest, Images, InferenceData, SegmentationLabels
 from app.utils.logging import LoggingRoute
 from clay.train import SegmentationDataModuleInference, SegmentorTraining, predict_classification
 
@@ -24,7 +24,7 @@ router = APIRouter(route_class=LoggingRoute)
 async def run_trained_model_inference(
     data: InferenceData, session: SessionDep
 ) -> SegmentationLabels | ClassificationLabels:
-    """Run inference of previously trained classification model on your data."""
+    """Run inference of trained model on your data."""
 
     model_metadata, local_model_path = await download_model(session, data.model)
 

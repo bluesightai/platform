@@ -3,8 +3,9 @@ import pickle
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Annotated, Any, Dict, List, Tuple
 
+import fastapi
 import h5py
 import lightning as L
 import numpy as np
@@ -31,13 +32,26 @@ router = APIRouter(route_class=LoggingRoute)
 
 @router.post("")
 async def create_training_job(training_job_create: TrainingJobCreate, session: SessionDep) -> TrainingJob:
+    """
+    Creates a training job which begins the process of creating a new model from a given dataset.
+
+    Response includes details of the enqueued job including job status and the name of the fine-tuned models once complete.
+    """
     training_job = await crud_training_job.create(db=session, obj_in=training_job_create)
     asyncio.create_task(execute_training_job(training_job, session))
     return training_job
 
 
-@router.get("/{training_job_id}")
-async def retrieve_training_job(training_job_id: str, session: SessionDep) -> TrainingJob:
+@router.get("/{training_job_id}", response_model_exclude_none=False)
+async def retrieve_training_job(
+    training_job_id: Annotated[
+        str, fastapi.Path(example="trainingjob-g0mos7xr", description="The ID of the training job")
+    ],
+    session: SessionDep,
+) -> TrainingJob:
+    """
+    Get info about a fine-tuning job.
+    """
     training_job = await crud_training_job.get(db=session, id=training_job_id)
     if not training_job:
         raise HTTPException(status_code=404, detail="Training job not found")
@@ -45,7 +59,15 @@ async def retrieve_training_job(training_job_id: str, session: SessionDep) -> Tr
 
 
 @router.delete("/{training_job_id}")
-async def cancel_training_job(training_job_id: str, session: SessionDep) -> TrainingJob:
+async def cancel_training_job(
+    training_job_id: Annotated[
+        str, fastapi.Path(example="trainingjob-g0mos7xr", description="The ID of the training job to cancel")
+    ],
+    session: SessionDep,
+) -> TrainingJob:
+    """
+    Immediately cancel a training job.
+    """
     training_job = await retrieve_training_job(training_job_id, session)
     if training_job.status in ["succeeded", "failed", "cancelled"]:
         raise HTTPException(
