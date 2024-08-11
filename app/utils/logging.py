@@ -1,5 +1,10 @@
+import http
 import json
+import logging
+import os
+import sys
 import time
+import warnings
 from typing import Callable
 
 from fastapi import HTTPException, Request, Response, status
@@ -86,3 +91,84 @@ class LoggingRoute(APIRoute):
             return response
 
         return custom_route_handler
+
+
+def get_status_color(status_code: int) -> str:
+    if status_code >= 500:
+        return "\x1b[31m"  # Red
+    elif status_code >= 400:
+        return "\x1b[33m"  # Yellow
+    elif status_code >= 300:
+        return "\x1b[36m"  # Cyan
+    elif status_code >= 200:
+        return "\x1b[32m"  # Green
+    else:
+        return "\x1b[37m"  # White
+
+
+class InterceptHandler(logging.Handler):
+    def emit(self, record):
+        # Get corresponding Loguru level if it exists
+        try:
+            level = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        # Find caller from where originated the logged message
+        frame, depth = sys._getframe(6), 6
+        while frame and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        # Check if this is an access log
+        if record.name == "uvicorn.access":
+            try:
+                # Parse the message to extract status code
+                parts = record.getMessage().split()
+                status_code = int(parts[-1])
+                color = get_status_color(status_code)
+                status_text = http.HTTPStatus(status_code).phrase
+
+                # Format the message similar to uvicorn's format
+                message = f'{" ".join(parts[:-1])} {color}{status_code} {status_text}\x1b[0m'
+
+                logger.opt(depth=depth, exception=record.exc_info).log(level, message, process=os.getpid())
+            except Exception:
+                # If parsing fails, log the original message
+                logger.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage(), process=os.getpid())
+        else:
+            # For non-access logs, include more detailed information
+            logger.opt(depth=depth, exception=record.exc_info).log(
+                level,
+                record.getMessage(),
+                file=record.filename,
+                function=record.funcName,
+                line=record.lineno,
+                process=os.getpid(),
+            )
+
+
+def warn_with_loguru(message, category, filename, lineno, file=None, line=None):
+    if file is not None:
+        try:
+            with open(filename) as f:
+                source_line = f.readlines()[lineno - 1].strip()
+        except (IOError, IndexError):
+            source_line = None
+    else:
+        source_line = None
+
+    warning_message = f"{filename}:{lineno}: {category.__name__}: {message}"
+    if source_line:
+        warning_message += f"\n  {source_line}"
+
+    logger.opt(depth=2).warning(
+        warning_message, file=filename, line=lineno, category=category.__name__, process=os.getpid()
+    )
+
+
+warnings.showwarning = warn_with_loguru
+
+intercept_handler = InterceptHandler()
+logging.getLogger("uvicorn").handlers = [InterceptHandler()]
+logging.getLogger("uvicorn.access").handlers = [InterceptHandler()]
