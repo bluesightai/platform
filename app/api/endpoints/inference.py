@@ -32,7 +32,7 @@ async def run_trained_model_inference(
         with open(local_model_path, "rb") as f:
             model = pickle.load(f)
 
-        embeddings = await get_embeddings_with_images(Images(images=data.images), session)
+        embeddings = await get_embeddings_with_images(EmbeddingsRequest(images=data.images), session)
         labels = predict_classification(clf=model, embeddings=np.array(embeddings.embeddings))
         return ClassificationLabels(labels=labels.tolist())
     elif model_metadata.task == "segmentation":
