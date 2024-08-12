@@ -4,8 +4,9 @@ from typing import List, Tuple
 from fastapi import APIRouter
 
 from app.api.deps import SessionDep
-from app.schemas.clay import Embeddings, Images, Points
+from app.schemas.clay import Embeddings, EmbeddingsRequest, Points
 from app.utils.logging import LoggingRoute
+from clay.clip import get_embeddings_from_images, get_embeddings_from_text
 from clay.model import get_embedding, get_embeddings_img
 from clay.utils import get_catalog_items, get_stack, stack_to_datacube
 
@@ -13,7 +14,7 @@ router = APIRouter(route_class=LoggingRoute)
 
 
 @router.post("/img")
-async def get_embeddings_with_images(images: Images, session: SessionDep) -> Embeddings:
+async def get_embeddings_with_images(images: EmbeddingsRequest, session: SessionDep) -> Embeddings:
     """Get embeddings for a list of images."""
     pixels: List[List[List[List[float]]]] = []
     points: List[Tuple[float, float] | None] = []
@@ -39,15 +40,21 @@ async def get_embeddings_with_images(images: Images, session: SessionDep) -> Emb
         points.append(image.point)
         datetimes.append(datetime.fromtimestamp(image.timestamp) if image.timestamp else None)
 
-    embeddings = get_embeddings_img(
-        gsd=images.images[0].gsd,
-        bands=images.images[0].bands,
-        pixels=pixels,
-        platform=images.images[0].platform,
-        wavelengths=images.images[0].wavelengths,
-        points=points,
-        datetimes=datetimes,
-    ).tolist()
+    if images.model == "clip":
+        embeddings = get_embeddings_from_images(images=pixels)
+    elif images.model == "clay":
+        embeddings = get_embeddings_img(
+            gsd=images.images[0].gsd,
+            bands=images.images[0].bands,
+            pixels=pixels,
+            platform=images.images[0].platform,
+            wavelengths=images.images[0].wavelengths,
+            points=points,
+            datetimes=datetimes,
+        ).tolist()
+    else:
+        raise ValueError("Invalid model")
+
     return Embeddings(embeddings=embeddings)
 
 
@@ -61,3 +68,10 @@ async def get_embeddings_with_coordinates(points: Points, session: SessionDep) -
     ]
     datacubes = [stack_to_datacube(lat=lat, lon=lon, stack=stack) for stack, (lat, lon) in zip(stacks, points.points)]
     return Embeddings(embeddings=[get_embedding(datacube=datacube).tolist() for datacube in datacubes])
+
+
+@router.post("/text")
+async def get_embeddings_with_text(texts: list[str], session: SessionDep) -> Embeddings:
+    """Get embeddings for a list of texts."""
+    embeddings = get_embeddings_from_text(texts=texts)
+    return Embeddings(embeddings=embeddings)

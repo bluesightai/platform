@@ -22,13 +22,18 @@ docker compose up -d --build
 
 ## ToDo
 
+- Run inference using files
+- Make everything except `pixels` optional on inference API
 - Try [BackgroundTasks](https://fastapi.tiangolo.com/tutorial/background-tasks/) instead of `asyncio.create_task` in training job creation
   - Be careful, logging might break it (or it may break itself)
 - If update crud schema contains several optional fields and only one is set, the rest are set to null in the update in the database
 - Files are loaded fully to RAM on server on upload (is it? debug)
 - Move fine-tunings to `clay` module
-- Create unified logging
-  - Also specify process in logging messages, take from AskGuru
 - Add auth and RLS to database
 - Calculate means and stds on train, save and use on inference
 - Move `pytorch` to separate poetry group
+- Maybe specify PID in logging messages
+- Docs
+  - Finish `/embeddings` and `/models` docs
+  - Return link to an object in the response schema like in [OpenAI API](https://platform.openai.com/docs/api-reference/fine-tuning/create)
+  - Return `null` values for key observability ([FastAPI issue](https://github.com/fastapi/fastapi/pull/3770))

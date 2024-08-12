@@ -1,7 +1,7 @@
 import random
 from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, validator
 
 from clay.config import default_wavelengths, metadata
 
@@ -103,6 +103,10 @@ class Images(BaseModel):
     )
 
 
+class EmbeddingsRequest(Images):
+    model: Literal["clay", "clip"] = Field(default="clay", description="Model to use for embeddings generation")
+
+
 class Embeddings(BaseModel):
     embeddings: List[List[float]] = Field(
         examples=[[[228.0, 322.1], [234.0, 231.5]]], description="Embedding representing an area"
@@ -121,15 +125,25 @@ class SegmentationTrainingDataSample(BaseModel):
 
 class InferenceData(BaseModel):
     model: str
+    """ID of the model to use.
+
+    Obtained from a `trained_model` field of a
+    [`TrainingJob` object](https://docs.bluesight.ai/api-reference/training-jobs/retrieve-training-job).
+    """
     images: List[Image]
+    """List of images to run inference on."""
+
+    model_config = ConfigDict(
+        use_attribute_docstrings=True,
+    )
 
 
 class ClassificationLabels(BaseModel):
-    labels: List[int]
+    labels: List[int] = Field(examples=[[0, 1]], description="Classification model inference: 1D int label array.")
 
 
 class SegmentationLabels(BaseModel):
     labels: List[List[List[int]]] = Field(
         examples=[[[[random.randint(0, 1) for _ in range(16)] for _ in range(16)] for _ in range(2)]],
-        description="3D (b, h, w) label array.",
+        description="Segmentation model inference: 3D (b, h, w) int label array.",
     )

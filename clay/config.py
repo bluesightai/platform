@@ -13,6 +13,8 @@ class Config(BaseSettings):
     platform: str = "naip"
     stac_api_url: str = "https://planetarycomputer.microsoft.com/api/stac/v1"
     batch_size: int = 512
+    clip_hub_repo_id: str = "furiousteabag/SkyCLIP"
+    clip_hub_filename: str = "SkyCLIP_ViT_L14_top30pct_filtered_by_CLIP_laion_RS_epoch_20.pt"
     # platform: str = "sentinel-2-l2a"
     # stac_api_url: str = "https://earth-search.aws.element84.com/v1"
 
