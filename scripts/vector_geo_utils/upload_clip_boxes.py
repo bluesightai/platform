@@ -2,18 +2,14 @@ import logging
 import multiprocessing
 import os
 import traceback
-from typing import List, Tuple
 
-import numpy as np
 import pandas as pd
 import psycopg2
-from db import postgres_uri
-from psycopg2.extensions import AsIs
-from psycopg2.extras import execute_batch, execute_values
+from psycopg2.extras import execute_batch
 from shapely import wkb
 from tqdm import tqdm
 
-from scripts.vector_geo_utils import db
+from scripts.vector_geo_utils.db import postgres_uri
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
