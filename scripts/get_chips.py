@@ -30,18 +30,29 @@ aoi = {
     "type": "Polygon",
     "coordinates": [
         [
-            [-122.54084201545855, 37.68495197750744],
-            [-122.29057106650372, 37.68495197750744],
-            [-122.29057106650372, 37.813643519362685],
-            [-122.54084201545855, 37.813643519362685],
-            [-122.54084201545855, 37.68495197750744],
+            [-122.55001691216607, 37.69678917155912],
+            [-122.25652389947702, 37.69678917155912],
+            [-122.25652389947702, 37.84163219504293],
+            [-122.55001691216607, 37.84163219504293],
+            [-122.55001691216607, 37.69678917155912],
         ]
     ],
 }
 
-# Search for NAIP imagery
+# Define your temporal range
+daterange = {"interval": ["2022-01-01", "2022-12-31T23:59:59Z"]}
+
+# Define your search with CQL2 syntax
 search = catalog.search(
-    collections=["naip"], intersects=aoi  # Specify the collection  # Use the intersects parameter for spatial search
+    filter_lang="cql2-json",
+    filter={
+        "op": "and",
+        "args": [
+            {"op": "s_intersects", "args": [{"property": "geometry"}, aoi]},
+            {"op": "anyinteracts", "args": [{"property": "datetime"}, daterange]},
+            {"op": "=", "args": [{"property": "collection"}, "naip"]},
+        ],
+    },
 )
 
 
