@@ -22,8 +22,8 @@ os.environ["GDAL_DISABLE_READDIR_ON_OPEN"] = "EMPTY_DIR"
 os.environ["AWS_REQUEST_PAYER"] = "requester"
 
 
-# Connect to the Planetary Computer STAC API
-catalog = Client.open("https://earth-search.aws.element84.com/v1")
+# Search against the Planetary Computer STAC API
+catalog = Client.open("https://planetarycomputer.microsoft.com/api/stac/v1")
 
 # Define your area of interest
 aoi = {
