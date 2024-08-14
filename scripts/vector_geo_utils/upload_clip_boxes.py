@@ -36,7 +36,11 @@ def batch_insert_parquet_to_postgres(args):
             embedding = row["embedding"]
             if isinstance(embedding, str):
                 embedding = eval(embedding)  # Convert string representation to list
-            data_to_insert.append((wkt_geometry, embedding.tolist()))
+            try:
+                data_to_insert.append((wkt_geometry, embedding.tolist()))
+            except AttributeError as e:
+                # print(e.__class__.__name__, e)
+                pass
 
             # Insert in batches
             if len(data_to_insert) >= batch_size:
@@ -115,6 +119,6 @@ def process_parquet_files(directory_path, batch_size=200):
 
 
 if __name__ == "__main__":
-    directory_path = "../../"  # Replace with your directory containing parquet files
+    directory_path = "./parquet_files"
     process_parquet_files(directory_path)
 
