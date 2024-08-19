@@ -13,55 +13,19 @@ from shapely.geometry import box
 from tqdm import tqdm
 from rasterio.windows import Window
 
+from scripts.embeddings import get_embeddings_batch
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 BATCH_SIZE = 100
-
-def ensure_rgb(image):
-    """Ensure the image is RGB."""
-    if image.shape[0] == 4:  # If RGBA, drop the alpha channel
-        return image[:3, :, :]
-    return image
-
-def resize_image(image, target_size=(224, 224)):
-    """Resize image to target size."""
-    if image.shape[1:] != target_size:
-        image = np.transpose(image, (1, 2, 0))
-        image = Image.fromarray(image)
-        image = image.resize(target_size, Image.BILINEAR)
-        image = np.array(image).transpose(2, 0, 1)
-    return image
-
-def get_embeddings_batch(images, gsd=0.6):
-    """Get embeddings for a batch of images using the bluesight.ai API."""
-    url = "https://api.bluesight.ai/embeddings/img"
-
-    payload = {
-        "model": "clip",
-        "images": [{"gsd": gsd, "bands": ["red", "green", "blue"], "pixels": image.tolist()} for image in images],
-    }
-    headers = {"Content-Type": "application/json"}
-
-    response = requests.post(url, json=payload, headers=headers)
-
-    if response.status_code == 200:
-        return json.loads(response.text)["embeddings"]
-    else:
-        print(f"Error getting embeddings: {response.text}")
-        return [None] * len(images)
-    
 
 def process_chip(src, x, y, chip_id, chip_size, output_dir):
     window = rasterio.windows.Window(x, y, chip_size, chip_size)
     chip_data = src.read(window=window)
 
-    # Handle 4-band images (assuming the 4th band is alpha or near-infrared)
-    if chip_data.shape[0] == 4:
-        chip_data = chip_data[:3, :, :]
 
-    # Check if the chip is empty (all zeros)
-    if np.all(chip_data == 0):
-        print(f"Skipping empty chip at x={x}, y={y}")
+    # Check if the chip is empty (all zeros or ones)
+    if np.all(chip_data <= 1):
         return None
 
     # Check if the chip is the correct size
@@ -69,22 +33,8 @@ def process_chip(src, x, y, chip_id, chip_size, output_dir):
         print(f"Skipping non-full chip at x={x}, y={y}")
         return None
 
-    # Convert to float32 for calculations
-    chip_data_float = chip_data.astype(np.float32)
-
-    # Normalize using the planet.com approach - 
-    # @TODO Change this to normalizying based on min/max for each band from the image 
-    chip_data_normalized = chip_data_float / 3000.0
-
-    # Clip values to [0, 1] range
-    chip_data_normalized = np.clip(chip_data_normalized, 0, 1)
-
-    # Convert to 8-bit for saving
-    chip_data_8bit = (chip_data_normalized * 255).astype(np.uint8)
-
-    # Save the chip
     chip_filename = os.path.join(output_dir, f"chip_{chip_id}.png")
-    Image.fromarray(np.transpose(chip_data_8bit, (1, 2, 0))).save(chip_filename)
+    Image.fromarray(np.transpose(chip_data, (1, 2, 0))).save(chip_filename)
 
     # Get the world coordinates of the chip
     world_left, world_top = src.xy(y, x)
@@ -97,9 +47,8 @@ def process_chip(src, x, y, chip_id, chip_size, output_dir):
         "chip_id": chip_id,
         "file_path": chip_filename,
         "geometry": bbox_geometry,
-        "image_data": chip_data_normalized  # Return normalized data for embedding
+        "image_data": chip_data  # Return the original 8-bit data for embedding
     }
-
 
 def process_image(tiff_file, output_dir, parquet_dir):
     image_id = os.path.splitext(os.path.basename(tiff_file))[0]
@@ -119,20 +68,12 @@ def process_image(tiff_file, output_dir, parquet_dir):
             print(f"Number of bands: {src.count}")
             print(f"Data type: {src.dtypes[0]}")
 
-            # Calculate min and max values
-            chunk_size = 1024
-            min_value = float('inf')
-            max_value = float('-inf')
-            for i in range(0, src.width, chunk_size):
-                for j in range(0, src.height, chunk_size):
-                    window = Window(i, j, min(chunk_size, src.width - i), min(chunk_size, src.height - j))
-                    chunk = src.read(window=window)
-                    chunk_min = np.min(chunk)
-                    chunk_max = np.max(chunk)
-                    min_value = min(min_value, chunk_min)
-                    max_value = max(max_value, chunk_max)
+            crs = src.crs
+            print(f"Coordinate Reference System (CRS): {crs}")
+            print(f"CRS WKT: {crs.to_wkt()}")
             
-            print(f"Image min: {min_value}, Image max: {max_value}")
+            if crs.is_epsg_code:
+                print(f"EPSG Code: {crs.to_epsg()}")
 
             height, width = src.height, src.width
             transformer = Transformer.from_crs(src.crs, "EPSG:4326", always_xy=True)
@@ -217,16 +158,8 @@ def process_image(tiff_file, output_dir, parquet_dir):
         logging.error(f"Error processing image {image_id}: {str(e)}")
         return 0
 
-
-
-
-
-
-
-
-
 # Main execution
-input_dir = "./sat_data/original/"  # Replace with the path to your TIFF files
+input_dir = "./sat_data/color/"  # Replace with the path to your TIFF files
 output_dir = "image_chips"
 parquet_dir = "parquet_files"
 os.makedirs(output_dir, exist_ok=True)

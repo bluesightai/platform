@@ -15,6 +15,8 @@ from pystac_client import Client
 from shapely.geometry import box
 from tqdm import tqdm
 
+from scripts.embeddings import get_embeddings_batch
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Optimize GDAL settings for cloud optimized reading
@@ -75,24 +77,6 @@ def resize_image(image, target_size=(224, 224)):
         image = np.array(image).transpose(2, 0, 1)
     return image
 
-
-def get_embeddings_batch(images, gsd=0.6):
-    """Get embeddings for a batch of images using the bluesight.ai API."""
-    url = "https://api.bluesight.ai/embeddings/img"
-
-    payload = {
-        "model": "clip",
-        "images": [{"gsd": gsd, "bands": ["red", "green", "blue"], "pixels": image.tolist()} for image in images],
-    }
-    headers = {"Content-Type": "application/json"}
-
-    response = requests.post(url, json=payload, headers=headers)
-
-    if response.status_code == 200:
-        return json.loads(response.text)["embeddings"]
-    else:
-        print(f"Error getting embeddings: {response.text}")
-        return [None] * len(images)
 
 
 def process_chip(src, x, y, chip_id, chip_size, output_dir):

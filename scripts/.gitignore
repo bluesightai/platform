@@ -1,2 +1,3 @@
 sat_data/
+.DS_Store
 parquet_files/
