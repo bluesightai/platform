@@ -41,11 +41,11 @@ S3_BUCKET=$(get_json_value "bucket")
 S3_KEY=$(get_json_value "key")
 S3_URL=$(get_json_value "url")
 REGION="us-east-1"
-FILE_NAME="1.tif"
+FILE_NAME="./sat_data/color/2.tif"
 MAPBOX_USERNAME="szymonzmyslony"
 MAPBOX_ACCESS_TOKEN="sk.eyJ1Ijoic3p5bW9uem15c2xvbnkiLCJhIjoiY2x6eWF4cGxsMTJxNDJscHpkZWJqazB4ZCJ9.sUUBnpNhItEWKFAnTuUsbg"
-TILESET_NAME="final_tanks"  # Replace with your desired tileset name
-TILESET_DISPLAY_NAME="final_tanks"  # Replace with your desired display name
+TILESET_NAME="final_tanks3"  # Replace with your desired tileset name
+TILESET_DISPLAY_NAME="final_tanks3"  # Replace with your desired display name
 
 # Upload file to S3
 echo "Uploading file to S3..."
