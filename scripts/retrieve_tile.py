@@ -426,7 +426,7 @@ async def insert_area(
 
     tiles = [
         tile
-        for split_tile in tiles
+        for split_tile in tqdm(tiles, desc="Splitting tiles", unit="tile")
         for tile in split_satellite_tile(tile_data=split_tile, target_size=target_tile_size)
     ]
     logger.info(f"Amount of tiles after splitting from {tile_size} to {target_tile_size}: {len(tiles)}")
