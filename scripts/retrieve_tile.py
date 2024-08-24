@@ -5,7 +5,7 @@ import urllib.parse
 from io import BytesIO
 from pathlib import Path
 from pprint import pformat
-from typing import Literal, Optional, TypedDict
+from typing import AsyncGenerator, Literal, Optional, TypedDict
 
 import aiohttp
 import asyncpg
@@ -260,25 +260,27 @@ async def fetch_tiles(
     end_lat: float,
     end_lng: float,
     zoom: int,
+    target_tile_size: int,
     cache_dir: Path = Path(".cache/gcp_tiles"),
-) -> list[TileData]:
+) -> AsyncGenerator[TileData, None]:
     """
-    Fetches satellite tiles for a given bounding box.
+    Fetches satellite tiles for a given bounding box and yields smaller split tiles.
 
     Args:
     session_token: The session token obtained from get_session_token function
-    api_key: Your Google Maps Platform API keys
-    tile_size: The size of the tiles
+    api_key: Your Google Maps Platform API key
+    tile_size: The size of the original tiles
     start_lat: The latitude of the top-left corner of the bounding bbox
     start_lng: The longitude of the top-left corner of the bounding bbox
     end_lat: The latitude of the bottom-right corner of the bounding bbox
     end_lng: The longitude of the bottom-right corner of the bounding bbox
     zoom: The zoom level of the tiles
+    target_tile_size: The size of the smaller tiles to split into
+    cache_dir: The path to the cache directory
 
-    Returns:
-    A list of dictionaries containing the tile images and their bounding box coordinates
+    Yields:
+    Smaller split TileData objects
     """
-
     start_x, start_y = from_lat_lng_to_tile_coord(start_lat, start_lng, zoom, tile_size)
     end_x, end_y = from_lat_lng_to_tile_coord(end_lat, end_lng, zoom, tile_size)
 
@@ -289,10 +291,9 @@ async def fetch_tiles(
     logger.info(f"Fetching {total_tiles} tiles from GCP")
 
     async with aiohttp.ClientSession() as session:
-        tasks = []
         for y in range(min_y, max_y + 1):
             for x in range(min_x, max_x + 1):
-                task = get_satellite_tile(
+                tile_data = await get_satellite_tile(
                     session=session,
                     session_token=session_token,
                     api_key=api_key,
@@ -301,16 +302,10 @@ async def fetch_tiles(
                     y=y,
                     cache_dir=cache_dir,
                 )
-                tasks.append(task)
-
-        tiles: list[TileData | None] = await async_tqdm.gather(
-            *tasks, desc="Fetching tiles", total=len(tasks), timeout=8 * 60 * 60
-        )
-
-    filtered_tiles: list[TileData] = [tile for tile in tiles if tile is not None]
-    logger.info(f"Retrieved {len(filtered_tiles)} out of {total_tiles} tiles after filtering out errors")
-
-    return filtered_tiles
+                if tile_data:
+                    split_tiles = split_satellite_tile(tile_data, target_tile_size)
+                    for split_tile in split_tiles:
+                        yield split_tile
 
 
 def get_image_hash(image: Image.Image) -> str:
@@ -459,7 +454,7 @@ async def insert_area(
     tile_size = session_data.get("tileWidth")
     logger.info(f"Retrieving tiles with size {tile_size}, scale {scale}, zoom {zoom}, cache dir {tiles_cache_dir}")
 
-    tiles = await fetch_tiles(
+    tiles_generator = fetch_tiles(
         session_token=session_token,
         api_key=GCP_API_KEY,
         tile_size=tile_size,
@@ -468,33 +463,39 @@ async def insert_area(
         end_lat=end_lat,
         end_lng=end_lng,
         zoom=zoom,
+        target_tile_size=target_tile_size,
         cache_dir=tiles_cache_dir,
     )
-
-    tiles = [
-        tile
-        for split_tile in tqdm(tiles, desc="Splitting tiles", unit="tile")
-        for tile in split_satellite_tile(tile_data=split_tile, target_size=target_tile_size)
-    ]
-    logger.info(f"Amount of tiles after splitting from {tile_size} to {target_tile_size}: {len(tiles)}")
 
     logger.info(f"Processing tiles and inserting into database in batches of {batch_size}")
     conn = await asyncpg.connect(postgres_uri, statement_cache_size=0)
     async with aiohttp.ClientSession() as session:
-        for i in tqdm(range(0, len(tiles), batch_size), desc="Processing and inserting batches", unit="batch"):
-            batch_tiles = tiles[i : i + batch_size]
+        batch = []
+        async for tile in tiles_generator:
+            batch.append(tile)
+            if len(batch) == batch_size:
+                # Process and insert the batch
+                batch_images = [tile["tile"] for tile in batch]
+                batch_embeddings = await get_embeddings(session=session, images=batch_images, model=embedding_model)
 
-            # Fetch embeddings for the current batch of tiles
-            batch_images = [tile["tile"] for tile in batch_tiles]
+                data = [
+                    (bbox_to_wkt((tile["nw_lng"], tile["nw_lat"], tile["se_lng"], tile["se_lat"])), embedding)
+                    for tile, embedding in zip(batch, batch_embeddings)
+                ]
+
+                await insert_to_postgres(conn=conn, table_name=table_name, data=data)
+                batch = []
+
+        # Process any remaining tiles
+        if batch:
+            batch_images = [tile["tile"] for tile in batch]
             batch_embeddings = await get_embeddings(session=session, images=batch_images, model=embedding_model)
 
-            # Prepare data for database insertion
             data = [
                 (bbox_to_wkt((tile["nw_lng"], tile["nw_lat"], tile["se_lng"], tile["se_lat"])), embedding)
-                for tile, embedding in zip(batch_tiles, batch_embeddings)
+                for tile, embedding in zip(batch, batch_embeddings)
             ]
 
-            # Insert the batch into the database
             await insert_to_postgres(conn=conn, table_name=table_name, data=data)
 
     await conn.close()
