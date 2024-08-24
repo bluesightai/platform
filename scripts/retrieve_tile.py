@@ -290,6 +290,8 @@ async def fetch_tiles(
     total_tiles = (max_x - min_x + 1) * (max_y - min_y + 1)
     logger.info(f"Fetching {total_tiles} tiles from GCP")
 
+    progress_bar = tqdm(total=total_tiles, desc="Fetching tiles")
+
     async with aiohttp.ClientSession() as session:
         for y in range(min_y, max_y + 1):
             for x in range(min_x, max_x + 1):
@@ -306,6 +308,9 @@ async def fetch_tiles(
                     split_tiles = split_satellite_tile(tile_data, target_tile_size)
                     for split_tile in split_tiles:
                         yield split_tile
+                progress_bar.update(1)
+
+    progress_bar.close()
 
 
 def get_image_hash(image: Image.Image) -> str:
