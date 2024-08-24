@@ -358,7 +358,9 @@ async def get_embeddings(
             embeddings.append([])
 
     cached_count = len(images) - len(uncached_images)
-    logger.info(f"{cached_count} out of {len(images)} images are cached, fetching {len(uncached_images)} embeddings")
+    logger.info(
+        f"{cached_count} out of {len(images)} embeddings are cached, fetching {len(uncached_images)} embeddings"
+    )
 
     if uncached_images:
         url = "https://api.bluesight.ai/embeddings/img"
@@ -392,17 +394,42 @@ async def insert_to_postgres(
     conn: asyncpg.Connection,
     table_name: str,
     data: list[tuple[str, list[float]]],
-) -> None:
+) -> list[int]:
+    """Insert a batch of data into a PostgreSQL table.
+
+    Args:
+    conn: An asyncpg Connection object
+    table_name: The name of the table to insert the data into (must have location and embedding columns)
+    data: A list of tuples containing the bounding box and embedding data
+
+    Returns:
+    A list of IDs for the inserted rows
+    """
     query = f"""
-    INSERT INTO {table_name} (location, embedding)
-    VALUES (ST_GeomFromText($1, 4326)::geography, $2)
-    ON CONFLICT (location) DO NOTHING
+    WITH input_rows(bbox, embedding) AS (
+        SELECT * FROM unnest($1::text[], $2::text[])
+    ), inserted AS (
+        INSERT INTO {table_name} (location, embedding)
+        SELECT ST_GeomFromText(input_rows.bbox, 4326)::geography, input_rows.embedding::vector
+        FROM input_rows
+        ON CONFLICT (location) DO NOTHING
+        RETURNING id, location
+    )
+    SELECT COALESCE(i.id, e.id) AS id
+    FROM input_rows
+    LEFT JOIN inserted i ON ST_GeomFromText(input_rows.bbox, 4326)::geography = i.location
+    LEFT JOIN {table_name} e ON ST_GeomFromText(input_rows.bbox, 4326)::geography = e.location
     """
 
-    # Convert data to the format expected by PostgreSQL
-    prepared_data = [(bbox, f"[{','.join(map(str, embedding))}]") for bbox, embedding in data]
+    bboxes: list[str]
+    embeddings: list[list[float]]
+    bboxes, embeddings = zip(*data)
 
-    await conn.executemany(query, prepared_data)
+    embedding_strings = [f"[{','.join(map(str, emb))}]" for emb in embeddings]
+
+    results = await conn.fetch(query, bboxes, embedding_strings)
+
+    return [row["id"] for row in results]
 
 
 async def insert_area(
@@ -475,7 +502,7 @@ async def insert_area(
     logger.info(f"Processing tiles and inserting into database in batches of {batch_size}")
     conn = await asyncpg.connect(postgres_uri, statement_cache_size=0)
     async with aiohttp.ClientSession() as session:
-        batch = []
+        batch: list[TileData] = []
         async for tile in tiles_generator:
             batch.append(tile)
             if len(batch) == batch_size:
@@ -488,7 +515,7 @@ async def insert_area(
                     for tile, embedding in zip(batch, batch_embeddings)
                 ]
 
-                await insert_to_postgres(conn=conn, table_name=table_name, data=data)
+                tile_ids = await insert_to_postgres(conn=conn, table_name=table_name, data=data)
                 batch = []
 
         # Process any remaining tiles
@@ -504,49 +531,6 @@ async def insert_area(
             await insert_to_postgres(conn=conn, table_name=table_name, data=data)
 
     await conn.close()
-
-    # # Calculate the dimensions of the final image
-    # width = sum(tile.width for (tile, _, _) in tiles[0])
-    # height = sum(row[0][0].height for row in tiles)
-    # # Create a new image to hold all tiles
-    # final_image = Image.new("RGB", (width, height))
-    # # Paste all tiles into the final image
-    # y_offset = 0
-    # for row in tiles:
-    #     x_offset = 0
-    #     for tile, _, _ in row:
-    #         final_image.paste(tile, (x_offset, y_offset))
-    #         x_offset += tile.width
-    #     y_offset += row[0][0].height
-    # return final_image
-
-    # lat, lng = 33.75680859184824, -118.23377899768916
-    # x, y = from_lat_lng_to_tile_coord(lat, lng, zoom, tile_size)
-    # async with aiohttp.ClientSession() as session:
-    #     tile_data = await get_satellite_tile(
-    #         session=session,
-    #         session_token=session_token,
-    #         api_key=GCP_API_KEY,
-    #         zoom=zoom,
-    #         x=x,
-    #         y=y,
-    #         cache_dir=cache_dir,
-    #     )
-    # if not tile_data:
-    #     raise ValueError("Error retrieving tile data")
-    # img, nw_lat, nw_lng, se_lat, se_lng = (
-    #     tile_data["tile"],
-    #     tile_data["nw_lat"],
-    #     tile_data["nw_lng"],
-    #     tile_data["se_lat"],
-    #     tile_data["se_lng"],
-    # )
-    # logger.debug(f"Bbox: {nw_lat:.6f}, {nw_lng:.6f}, {se_lat:.6f}, {se_lng:.6f}")
-    # tiles = split_satellite_tile(tile_data=tile_data, target_size=256)
-    # logger.info(f"Split into {len(tiles)} tiles")
-    # plt.imshow(img)
-    # plt.axis("off")
-    # plt.show()
 
 
 if __name__ == "__main__":
