@@ -19,6 +19,7 @@ from PIL import Image
 from shapely import geometry
 from supabase import acreate_client
 from supabase.client import AsyncClient
+from tenacity import retry, stop_after_attempt, wait_exponential
 from tqdm import tqdm
 
 # Add this to the existing imports
@@ -438,6 +439,7 @@ async def insert_to_postgres(
     return [row["id"] for row in results]
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def upload_to_supabase(
     supabase_client: AsyncClient,
     bucket_name: str,
