@@ -1,4 +1,7 @@
+import asyncio
 import hashlib
+import io
+import json
 import math
 import os
 import urllib.parse
@@ -14,8 +17,11 @@ from fire import Fire
 from loguru import logger
 from PIL import Image
 from shapely import geometry
+from supabase import acreate_client
+from supabase.client import AsyncClient
 from tqdm import tqdm
-from tqdm.asyncio import tqdm as async_tqdm
+
+# Add this to the existing imports
 
 
 class TileData(TypedDict):
@@ -432,6 +438,30 @@ async def insert_to_postgres(
     return [row["id"] for row in results]
 
 
+async def upload_to_supabase(
+    supabase_client: AsyncClient,
+    bucket_name: str,
+    file_name: str,
+    file_content: bytes,
+) -> None:
+    """Upload a file to Supabase storage asynchronously.
+
+    Args:
+    supabase_client: An asynchronous Supabase client object
+    bucket_name: The name of the storage bucket
+    file_name: The name of the file to be stored
+    file_content: The content of the file as bytes
+    """
+    try:
+        await supabase_client.storage.from_(bucket_name).upload(file_name, file_content, {"content-type": "image/png"})
+        logger.debug(f"Uploaded file {file_name} to Supabase storage bucket {bucket_name}")
+    except Exception as e:
+        if eval(str(e)).get("error") != "Duplicate":
+            logger.error(f"Error uploading file {file_name} to Supabase storage: {e}")
+        else:
+            logger.debug(f"File {file_name} already exists in Supabase storage bucket {bucket_name}")
+
+
 async def insert_area(
     start_lat: float = 37.811219311975265,
     start_lng: float = -122.52665573314543,
@@ -443,6 +473,7 @@ async def insert_area(
     embedding_model: Literal["clip", "clay"] = "clip",
     batch_size: int = 256,
     table_name: str = "clip_boxes_gcp",
+    bucket_name: str = "clip_boxes_gcp",
 ):
     """Insert satellite tiles and embeddings for a specified area into a PostgreSQL database.
 
@@ -457,6 +488,7 @@ async def insert_area(
     embedding_model: The name of the model to use for embeddings
     batch_size: The number of tiles to process and insert into the database at a time
     table_name: The name of the table to insert the data into
+    bucket_name: The name of the Supabase storage bucket to upload the tiles to
     """
 
     GCP_API_KEY = os.getenv("GCP_API_KEY")
@@ -467,6 +499,12 @@ async def insert_area(
     if not SUPABASE_POSTGRES_PASSWORD:
         raise ValueError("Please set the SUPABASE_POSTGRES_PASSWORD environment variable")
     postgres_uri = f"postgresql://postgres.biccczfztgnfaqzmizan:{urllib.parse.quote_plus(SUPABASE_POSTGRES_PASSWORD)}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+
+    SUPABASE_URL, SUPABASE_KEY = os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY")
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise ValueError("Please set the SUPABASE_URL and SUPABASE_KEY environment variables")
+
+    supabase_client: AsyncClient = await acreate_client(SUPABASE_URL, SUPABASE_KEY)
 
     tiles_cache_dir = Path(f".cache/gcp_tiles/{scale}")
 
@@ -516,6 +554,24 @@ async def insert_area(
                 ]
 
                 tile_ids = await insert_to_postgres(conn=conn, table_name=table_name, data=data)
+
+                upload_tasks = []
+                for tile_id, tile_data in zip(tile_ids, batch):
+                    img_byte_arr = io.BytesIO()
+                    tile_data["tile"].save(img_byte_arr, format="PNG")
+                    img_byte_arr = img_byte_arr.getvalue()
+
+                    file_name = f"{tile_id}.png"
+                    upload_task = upload_to_supabase(
+                        supabase_client=supabase_client,
+                        bucket_name=bucket_name,
+                        file_name=file_name,
+                        file_content=img_byte_arr,
+                    )
+                    upload_tasks.append(upload_task)
+
+                await asyncio.gather(*upload_tasks)
+
                 batch = []
 
         # Process any remaining tiles
