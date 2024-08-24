@@ -1,21 +1,19 @@
-import asyncio
+import hashlib
 import math
 import os
-import traceback
 import urllib.parse
 from io import BytesIO
 from pathlib import Path
 from pprint import pformat
-from typing import List, Literal, Optional, Tuple, TypedDict, Union
+from typing import Literal, Optional, TypedDict
 
 import aiohttp
 import asyncpg
-import matplotlib.pyplot as plt
 import numpy as np
 from fire import Fire
 from loguru import logger
 from PIL import Image
-from shapely import geometry, wkt
+from shapely import geometry
 from tqdm import tqdm
 from tqdm.asyncio import tqdm as async_tqdm
 
@@ -29,7 +27,7 @@ class TileData(TypedDict):
 
 
 class StyleDict(TypedDict, total=False):
-    stylers: List[dict]
+    stylers: list[dict]
     featureType: str
     elementType: str
 
@@ -49,7 +47,7 @@ def bbox_to_wkt(bbox: tuple[float, float, float, float]) -> str:
     return polygon.wkt
 
 
-def from_lat_lng_to_point(lat: float, lng: float, tile_size: int) -> Tuple[float, float]:
+def from_lat_lng_to_point(lat: float, lng: float, tile_size: int) -> tuple[float, float]:
     """Convert latitude and longitude to point coordinates."""
     siny = math.sin((lat * math.pi) / 180)
     siny = min(max(siny, -0.9999), 0.9999)
@@ -60,7 +58,7 @@ def from_lat_lng_to_point(lat: float, lng: float, tile_size: int) -> Tuple[float
     return (x, y)
 
 
-def from_lat_lng_to_tile_coord(lat: float, lng: float, zoom: int, tile_size: int) -> Tuple[int, int]:
+def from_lat_lng_to_tile_coord(lat: float, lng: float, zoom: int, tile_size: int) -> tuple[int, int]:
     """Convert latitude and longitude to tile coordinates."""
     x, y = from_lat_lng_to_point(lat, lng, tile_size)
     scale = 1 << zoom
@@ -68,7 +66,7 @@ def from_lat_lng_to_tile_coord(lat: float, lng: float, zoom: int, tile_size: int
     return int(x * scale / tile_size), int(y * scale / tile_size)
 
 
-def from_tile_coord_to_lat_lng(x: int, y: int, zoom: int, tile_size: int) -> Tuple[float, float]:
+def from_tile_coord_to_lat_lng(x: int, y: int, zoom: int, tile_size: int) -> tuple[float, float]:
     scale = 1 << zoom
     world_coord = (x * tile_size / scale, y * tile_size / scale)
 
@@ -86,10 +84,10 @@ async def get_session_token(
     image_format: Optional[Literal["jpeg", "png"]] = None,
     scale: Literal["scaleFactor1x", "scaleFactor2x", "scaleFactor4x"] = "scaleFactor1x",
     high_dpi: bool = False,
-    layer_types: Optional[List[Literal["layerRoadmap", "layerStreetview", "layerTraffic"]]] = None,
-    styles: Optional[List[StyleDict]] = None,
+    layer_types: Optional[list[Literal["layerRoadmap", "layerStreetview", "layerTraffic"]]] = None,
+    styles: Optional[list[StyleDict]] = None,
     overlay: Optional[bool] = None,
-    api_options: Optional[List[str]] = None,
+    api_options: Optional[list[str]] = None,
 ) -> Optional[SessionResponse]:
     """
     Retrieves a session token from the Google Maps Platform Map Tiles API.
@@ -194,7 +192,7 @@ async def get_satellite_tile(
         return None
 
 
-def split_satellite_tile(tile_data: TileData, target_size: int) -> List[TileData]:
+def split_satellite_tile(tile_data: TileData, target_size: int) -> list[TileData]:
     """
     Splits a satellite tile into smaller tiles of the specified size.
 
@@ -224,7 +222,7 @@ def split_satellite_tile(tile_data: TileData, target_size: int) -> List[TileData
     lat_step = (se_lat - nw_lat) / tiles_per_side
     lng_step = (se_lng - nw_lng) / tiles_per_side
 
-    result: List[TileData] = []
+    result: list[TileData] = []
 
     for y in range(tiles_per_side):
         for x in range(tiles_per_side):
@@ -305,42 +303,89 @@ async def fetch_tiles(
                 )
                 tasks.append(task)
 
-        tiles: List[TileData | None] = await async_tqdm.gather(*tasks, desc="Fetching tiles", total=len(tasks))
+        tiles: list[TileData | None] = await async_tqdm.gather(
+            *tasks, desc="Fetching tiles", total=len(tasks), timeout=8 * 60 * 60
+        )
 
-    filtered_tiles: List[TileData] = [tile for tile in tiles if tile is not None]
+    filtered_tiles: list[TileData] = [tile for tile in tiles if tile is not None]
     logger.info(f"Retrieved {len(filtered_tiles)} out of {total_tiles} tiles after filtering out errors")
 
     return filtered_tiles
 
 
-async def get_embeddings(session: aiohttp.ClientSession, images: List[Image.Image]) -> List[List[float]]:
+def get_image_hash(image: Image.Image) -> str:
+    """Generate a hash for an image based on its content and size."""
+    img_array = np.array(image)
+    return hashlib.md5(img_array.tobytes()).hexdigest()
+
+
+def get_cache_path(image: Image.Image, model: str, cache_dir: Path) -> Path:
+    """Generate a cache file path based on image characteristics and model."""
+    img_hash = get_image_hash(image)
+    width, height = image.size
+    return cache_dir / model / f"{width}x{height}" / f"{img_hash}.npy"
+
+
+async def get_embeddings(
+    session: aiohttp.ClientSession,
+    images: list[Image.Image],
+    model: Literal["clip", "clay"],
+    cache_dir: Path = Path(".cache/embeddings"),
+) -> list[list[float]]:
     """Get embeddings for a batch of images using the bluesight.ai API asynchronously.
 
     Args:
     session: An aiohttp ClientSession object
     images: A list of PIL Image objects
+    model: The name of the model to use for embeddings
+    cache_dir: The directory to store cached embeddings
 
     Returns:
-    A list of embeddings for each image, or None if an error
+    A list of embeddings for each image
     """
-    url = "https://api.bluesight.ai/embeddings/img"
+    embeddings: list[list[float]] = []
+    uncached_images: list[Image.Image] = []
+    uncached_indices: list[int] = []
 
-    payload = {
-        "model": "clip",
-        "images": [
-            {
-                "gsd": 0.6,
-                "bands": ["red", "green", "blue"],
-                "pixels": np.array(image.convert("RGB")).transpose(2, 0, 1).tolist(),
-            }
-            for image in images
-        ],
-    }
-    headers = {"Content-Type": "application/json"}
+    for i, image in enumerate(images):
+        cache_file = get_cache_path(image, model, cache_dir)
+        if cache_file.exists():
+            embedding: list[float] = np.load(cache_file).tolist()
+            embeddings.append(embedding)
+        else:
+            uncached_images.append(image)
+            uncached_indices.append(i)
+            embeddings.append([])
 
-    async with session.post(url, json=payload, headers=headers) as response:
-        response.raise_for_status()
-        return (await response.json())["embeddings"]
+    cached_count = len(images) - len(uncached_images)
+    logger.info(f"{cached_count} out of {len(images)} images are cached, fetching {len(uncached_images)} embeddings")
+
+    if uncached_images:
+        url = "https://api.bluesight.ai/embeddings/img"
+        payload = {
+            "model": model,
+            "images": [
+                {
+                    "gsd": 0.6,
+                    "bands": ["red", "green", "blue"],
+                    "pixels": np.array(image.convert("RGB")).transpose(2, 0, 1).tolist(),
+                }
+                for image in uncached_images
+            ],
+        }
+        headers = {"Content-Type": "application/json"}
+
+        async with session.post(url, json=payload, headers=headers) as response:
+            response.raise_for_status()
+            new_embeddings: list[list[float]] = (await response.json())["embeddings"]
+
+        for i, embedding in zip(uncached_indices, new_embeddings):
+            cache_file = get_cache_path(images[i], model, cache_dir)
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            np.save(cache_file, np.array(embedding))
+            embeddings[i] = embedding
+
+    return embeddings
 
 
 async def insert_to_postgres(
@@ -368,6 +413,7 @@ async def insert_area(
     zoom: int = 18,
     scale: Literal["scaleFactor1x", "scaleFactor2x", "scaleFactor4x"] = "scaleFactor4x",
     target_tile_size: int = 256,
+    embedding_model: Literal["clip", "clay"] = "clip",
     batch_size: int = 256,
     table_name: str = "clip_boxes_gcp",
 ):
@@ -381,6 +427,7 @@ async def insert_area(
     zoom: The zoom level of the tiles
     scale: Scales-up the size of map elements
     target_tile_size: The size of the smaller tiles
+    embedding_model: The name of the model to use for embeddings
     batch_size: The number of tiles to process and insert into the database at a time
     table_name: The name of the table to insert the data into
     """
@@ -394,7 +441,7 @@ async def insert_area(
         raise ValueError("Please set the SUPABASE_POSTGRES_PASSWORD environment variable")
     postgres_uri = f"postgresql://postgres.biccczfztgnfaqzmizan:{urllib.parse.quote_plus(SUPABASE_POSTGRES_PASSWORD)}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
 
-    cache_dir = Path(f".cache/gcp_tiles/{scale}")
+    tiles_cache_dir = Path(f".cache/gcp_tiles/{scale}")
 
     session_data = await get_session_token(
         api_key=GCP_API_KEY,
@@ -410,7 +457,7 @@ async def insert_area(
     logger.info(f"GCP session data:\n{pformat(session_data)}")
     session_token = session_data.get("session")
     tile_size = session_data.get("tileWidth")
-    logger.info(f"Retrieving tiles with size {tile_size}, scale {scale}, zoom {zoom}, cache dir {cache_dir}")
+    logger.info(f"Retrieving tiles with size {tile_size}, scale {scale}, zoom {zoom}, cache dir {tiles_cache_dir}")
 
     tiles = await fetch_tiles(
         session_token=session_token,
@@ -421,7 +468,7 @@ async def insert_area(
         end_lat=end_lat,
         end_lng=end_lng,
         zoom=zoom,
-        cache_dir=cache_dir,
+        cache_dir=tiles_cache_dir,
     )
 
     tiles = [
@@ -439,7 +486,7 @@ async def insert_area(
 
             # Fetch embeddings for the current batch of tiles
             batch_images = [tile["tile"] for tile in batch_tiles]
-            batch_embeddings = await get_embeddings(session=session, images=batch_images)
+            batch_embeddings = await get_embeddings(session=session, images=batch_images, model=embedding_model)
 
             # Prepare data for database insertion
             data = [
