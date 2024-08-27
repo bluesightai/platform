@@ -38,6 +38,8 @@ h5py = "^3.11.0"
 rastervision = "^0.31.0"
 stacchip = "^0.1.38"
 open-clip-torch = "^2.26.1"
+ultralytics = "^8.2.82"
+clip = {git = "https://github.com/openai/CLIP.git"}
 
 [tool.poetry.group.app.dependencies]
 fastapi = "^0.111.0"
