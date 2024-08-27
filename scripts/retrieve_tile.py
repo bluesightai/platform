@@ -465,19 +465,24 @@ async def upload_to_supabase(
 
 
 async def insert_area(
-    start_lat: float = 37.811219311975265,
-    start_lng: float = -122.52665573314543,
-    end_lat: float = 37.69850383939589,
-    end_lng: float = -122.34837526369923,
+    start_lat: float = 29.7624311358678,
+    start_lng: float = -95.1304100547797,
+    end_lat: float = 29.585439488973286,
+    end_lng: float = -94.96849737842977,
     zoom: int = 18,
     scale: Literal["scaleFactor1x", "scaleFactor2x", "scaleFactor4x"] = "scaleFactor4x",
     target_tile_size: int = 256,
     embedding_model: Literal["clip", "clay"] = "clip",
     batch_size: int = 256,
-    table_name: str = "clip_boxes_gcp",
-    bucket_name: str = "clip_boxes_gcp",
+    table_name: str = "clip_boxes_gcp_houston",
+    bucket_name: str = "clip_boxes_gcp_houston",
 ):
     """Insert satellite tiles and embeddings for a specified area into a PostgreSQL database.
+
+    SF: 37.811219311975265, -122.52665573314543, 37.69850383939589, -122.34837526369923
+    LA port: 33.78120548898004, -118.32824973224359, 33.69450702401006, -118.13318898292924
+    NY bay: 40.70484394607446, -74.19615310512826, 40.61944007176511, -73.97058948914278
+    Houston port: 29.7624311358678, -95.1304100547797, 29.585439488973286, -94.96849737842977
 
     Args:
     start_lat: The latitude of the top-left corner of the bounding bbox
