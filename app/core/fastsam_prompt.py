@@ -4,7 +4,7 @@ https://github.com/CASIA-IVA-Lab/FastSAM/blob/main/fastsam/prompt.py
 
 The only change is that `text_prompt` now returns a list of annotations instead of a single annotation.
 
-We can't use ultralytics because it's a private package, so we need to copy the code here.
+We can't use ultralytics because it returns an error on text generation, so we need to copy the code here.
 https://docs.ultralytics.com/models/fast-sam/#usage-examples
 
 Requirements: git+https://github.com/openai/CLIP.git
@@ -13,11 +13,13 @@ Requirements: git+https://github.com/openai/CLIP.git
 import os
 import sys
 
-import clip
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+import open_clip
 import torch
+from huggingface_hub import hf_hub_download
+from numpy.typing import NDArray
 from PIL import Image
 
 
@@ -32,13 +34,14 @@ def image_to_np_ndarray(image):
 
 
 class FastSAMPrompt:
-
     def __init__(self, image, results, device="cuda"):
         if isinstance(image, str) or isinstance(image, Image.Image):
             image = image_to_np_ndarray(image)
         self.device = device
         self.results = results
         self.img = image
+        self.model, _, self.preprocess = self._load_clip_model()
+        self.tokenizer = open_clip.get_tokenizer("ViT-L-14")
 
     def _segment_image(self, image, bbox):
         if isinstance(image, Image.Image):
@@ -89,7 +92,7 @@ class FastSAMPrompt:
 
         return [a for i, a in enumerate(annotations) if i not in to_remove], to_remove
 
-    def _get_bbox_from_mask(self, mask):
+    def _get_bbox_from_mask(self, mask) -> tuple[int, int, int, int]:
         mask = mask.astype(np.uint8)
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         x1, y1, w, h = cv2.boundingRect(contours[0])
@@ -104,7 +107,7 @@ class FastSAMPrompt:
                 y2 = max(y2, y_t + h_t)
             h = y2 - y1
             w = x2 - x1
-        return [x1, y1, x2, y2]
+        return (x1, y1, x2, y2)
 
     def plot_to_result(
         self,
@@ -355,31 +358,45 @@ class FastSAMPrompt:
             show_cpu = cv2.resize(show_cpu, (target_width, target_height), interpolation=cv2.INTER_NEAREST)
         ax.imshow(show_cpu)
 
-    # clip
+    def _load_clip_model(
+        self,
+        repo_id="furiousteabag/SkyCLIP",
+        filename="SkyCLIP_ViT_L14_top30pct_filtered_by_CLIP_laion_RS_epoch_20.pt",
+        model_name="ViT-L-14",
+    ):
+        ckpt_path = hf_hub_download(repo_id=repo_id, filename=filename)
+        model, _, preprocess = open_clip.create_model_and_transforms(
+            model_name=model_name, pretrained=ckpt_path, force_quick_gelu=True, device=self.device
+        )
+        model.eval()
+        return model, _, preprocess
+
     @torch.no_grad()
-    def retrieve(self, model, preprocess, elements, search_text: str, device) -> int:
-        preprocessed_images = [preprocess(image).to(device) for image in elements]
-        tokenized_text = clip.tokenize([search_text]).to(device)
-        stacked_images = torch.stack(preprocessed_images)
-        image_features = model.encode_image(stacked_images)
-        text_features = model.encode_text(tokenized_text)
+    def retrieve(self, elements: list[Image.Image], search_text: str) -> torch.Tensor:
+        preprocessed_images = torch.stack([self.preprocess(image) for image in elements]).to(self.device)
+        tokenized_text = self.tokenizer([search_text]).to(self.device)
+        with torch.cuda.amp.autocast():
+            image_features = self.model.encode_image(preprocessed_images)
+            text_features = self.model.encode_text(tokenized_text)
         image_features /= image_features.norm(dim=-1, keepdim=True)
         text_features /= text_features.norm(dim=-1, keepdim=True)
-        probs = 100.0 * image_features @ text_features.T
-        return probs[:, 0].softmax(dim=0)
+        probs = 100.0 * (image_features @ text_features.T)
+        # return probs[:, 0].softmax(dim=0)
+        return probs[:, 0]
 
-    def _crop_image(self, format_results):
-
+    def _crop_image(
+        self, format_results: list[dict]
+    ) -> tuple[list[Image.Image], list[tuple[int, int, int, int]], list, list[int], list[dict]]:
         image = Image.fromarray(cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB))
         ori_w, ori_h = image.size
         annotations = format_results
         mask_h, mask_w = annotations[0]["segmentation"].shape
         if ori_w != mask_w or ori_h != mask_h:
             image = image.resize((mask_w, mask_h))
-        cropped_boxes = []
-        cropped_images = []
-        not_crop = []
-        filter_id = []
+        cropped_boxes: list[Image.Image] = []
+        cropped_images: list[tuple[int, int, int, int]] = []
+        not_crop: list = []
+        filter_id: list[int] = []
         # annotations, _ = filter_masks(annotations)
         # filter_id = list(_)
         for _, mask in enumerate(annotations):
@@ -388,7 +405,7 @@ class FastSAMPrompt:
                 continue
             bbox = self._get_bbox_from_mask(mask["segmentation"])  # mask 的 bbox
             cropped_boxes.append(self._segment_image(image, bbox))
-            # cropped_boxes.append(segment_image(image,mask["segmentation"]))
+            # cropped_boxes.append(segment_image(image, mask["segmentation"]))
             cropped_images.append(bbox)  # Save the bounding box of the cropped image.
 
         return cropped_boxes, cropped_images, not_crop, filter_id, annotations
@@ -456,13 +473,12 @@ class FastSAMPrompt:
         onemask = onemask >= 1
         return np.array([onemask])
 
-    def text_prompt(self, text, top_k=20):
+    def text_prompt(self, text: str, top_k: int = 20) -> NDArray[np.float32]:
         if self.results == None:
-            return []
+            return np.array([])
         format_results = self._format_results(self.results[0], 0)
         cropped_boxes, cropped_images, not_crop, filter_id, annotations = self._crop_image(format_results)
-        clip_model, preprocess = clip.load("ViT-B/32", device=self.device)
-        scores = self.retrieve(clip_model, preprocess, cropped_boxes, text, device=self.device)
+        scores = self.retrieve(cropped_boxes, text)
         max_indices = scores.argsort(descending=True)[:top_k]
         adjusted_indices = [idx + sum(np.array(filter_id) <= int(idx)) for idx in max_indices]
         return np.array([annotations[idx]["segmentation"] for idx in adjusted_indices])
