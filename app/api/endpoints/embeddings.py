@@ -28,17 +28,17 @@ async def get_embeddings_with_images(images: EmbeddingsRequestBase, session: Ses
     platform, gsd, bands = first_image.platform, first_image.gsd, first_image.bands
     pixel_shape = None
     for image in images.images:
-        if image.platform != platform:
-            raise ValueError("Inconsistent platform across images")
-        if image.gsd != gsd:
-            raise ValueError("Inconsistent gsd across images")
-        if image.bands != bands:
-            raise ValueError("Inconsistent bands across images")
+        # if image.platform != platform:
+        #     raise ValueError("Inconsistent platform across images")
+        # if image.gsd != gsd:
+        #     raise ValueError("Inconsistent gsd across images")
+        # if image.bands != bands:
+        #     raise ValueError("Inconsistent bands across images")
 
-        if pixel_shape is None:
-            pixel_shape = len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])
-        elif (len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])) != pixel_shape:
-            raise ValueError("Inconsistent pixel shapes across images")
+        # if pixel_shape is None:
+        #     pixel_shape = len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])
+        # elif (len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])) != pixel_shape:
+        #     raise ValueError("Inconsistent pixel shapes across images")
 
         img_array = np.load(io.BytesIO(base64.b64decode(image.pixels)))
         if len(img_array.shape) != len(bands):
