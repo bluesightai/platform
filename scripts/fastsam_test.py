@@ -3,6 +3,7 @@ Modified original inference script:
 https://github.com/CASIA-IVA-Lab/FastSAM/blob/main/Inference.py
 """
 
+import time
 from typing import Literal
 
 import fire
@@ -10,6 +11,7 @@ import torch
 from huggingface_hub import hf_hub_download
 from PIL import Image
 from ultralytics import FastSAM
+from ultralytics.engine.model import Results
 
 from app.core.fastsam_prompt import FastSAMPrompt
 
@@ -65,9 +67,11 @@ def main(
     box_prompt = convert_box_xywh_to_xyxy(box_prompt)
 
     input_image = Image.open(img_path).convert("RGB")
-    everything_results = model(input_image, device=device, retina_masks=retina, imgsz=imgsz, conf=conf, iou=iou)
+    everything_results: list[Results] = model(
+        input_image, device=device, retina_masks=retina, imgsz=imgsz, conf=conf, iou=iou
+    )
 
-    prompt_process = FastSAMPrompt(input_image, everything_results, device=device)
+    prompt_process = FastSAMPrompt(input_image, everything_results, device="api")
 
     bboxes = None
     points = None
@@ -75,7 +79,6 @@ def main(
         ann = prompt_process.box_prompt(bboxes=box_prompt)
         bboxes = box_prompt
     elif text_prompt:
-        import time
 
         start_time = time.time()
         ann = prompt_process.text_prompt(text=text_prompt, top_k=text_prompt_top_k)
