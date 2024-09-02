@@ -1,10 +1,14 @@
+import base64
+import io
 from datetime import datetime
 from typing import List, Tuple
 
+import numpy as np
 from fastapi import APIRouter
+from numpy.typing import NDArray
 
 from app.api.deps import SessionDep
-from app.schemas.clay import Embeddings, EmbeddingsRequest, Points
+from app.schemas.clay import Embeddings, EmbeddingsRequestBase, Points
 from app.utils.logging import LoggingRoute
 from clay.clip import get_embeddings_from_images, get_embeddings_from_text
 from clay.model import get_embedding, get_embeddings_img
@@ -14,9 +18,9 @@ router = APIRouter(route_class=LoggingRoute)
 
 
 @router.post("/img")
-async def get_embeddings_with_images(images: EmbeddingsRequest, session: SessionDep) -> Embeddings:
+async def get_embeddings_with_images(images: EmbeddingsRequestBase, session: SessionDep) -> Embeddings:
     """Get embeddings for a list of images."""
-    pixels: List[List[List[List[float]]]] = []
+    pixels: List[NDArray[np.uint8]] = []
     points: List[Tuple[float, float] | None] = []
     datetimes: List[datetime | None] = []
     # Check consistency of platform, gsd, and bands
@@ -36,7 +40,10 @@ async def get_embeddings_with_images(images: EmbeddingsRequest, session: Session
         elif (len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])) != pixel_shape:
             raise ValueError("Inconsistent pixel shapes across images")
 
-        pixels.append(image.pixels)
+        img_array = np.load(io.BytesIO(base64.b64decode(image.pixels)))
+        if len(img_array.shape) != len(bands):
+            raise ValueError(f"Expected {len(bands)} bands, got {len(img_array.shape)}")
+        pixels.append(img_array)
         points.append(image.point)
         datetimes.append(datetime.fromtimestamp(image.timestamp) if image.timestamp else None)
 

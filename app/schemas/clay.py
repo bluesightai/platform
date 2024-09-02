@@ -107,6 +107,51 @@ class EmbeddingsRequest(Images):
     model: Literal["clay", "clip"] = Field(default="clay", description="Model to use for embeddings generation")
 
 
+class ImageBase(BaseModel):
+    gsd: float = Field(
+        examples=[0.6], description="gsd's of each band in images list (should be the same across all bands)"
+    )
+    bands: List[str] = Field(
+        examples=[["red", "green", "blue"]],
+        description="Order of bands in pixels array. Used to retrieve means, stds and wavelengths. Pick from 'blue', 'green', 'red', 'rededge1', 'rededge2', 'rededge3', 'nir', 'nir08', 'swir16', 'swir22'.",
+    )
+    pixels: str = Field(..., description="Base64 encoded image data")
+    platform: str | None = Field(
+        default=None,
+        examples=list(metadata.keys()),
+        description=f"One of {list(metadata.keys())}. Used to retrieve means, stds and wavelengths across bands. If not provided, means and stds will be calculated from list of images, and default wavelengths will be used",
+    )
+    wavelengths: List[float] | None = Field(
+        default=None,
+        examples=[[0.665, 0.56, 0.493]],
+        description=f"Bands' wavelengths. Should be provided only if `platform` is `None`, because when `platform` is provided wavelengths will be loaded from config. If `platform` is `None` and wavelengths are not provided, default values from `sentinel-2-l2a` will be used: {default_wavelengths}",
+    )
+    point: Tuple[float, float] | None = Field(
+        default=None,
+        examples=[(37.77625, -122.43267), (40.68926, -74.04457)],
+        description="(lat, lon) coordinate of the center of an image. Doesn't have a huge impact on model output.",
+    )
+    timestamp: int | None = Field(
+        default=None,
+        examples=[1714423534, 1614422534],
+        description="Timestamp when image was taken. Doesn't have a huge impact on model output.",
+    )
+
+    @validator("platform")
+    def check_platform_in_range(cls, value):
+        if value is not None and value not in list(metadata.keys()):
+            raise ValueError(f"Platform must be one of {list(metadata.keys())}")
+        return value
+
+
+class ImagesBase(BaseModel):
+    images: List[ImageBase]
+
+
+class EmbeddingsRequestBase(ImagesBase):
+    model: Literal["clay", "clip"] = Field(default="clay", description="Model to use for embeddings generation")
+
+
 class Embeddings(BaseModel):
     embeddings: List[List[float]] = Field(
         examples=[[[228.0, 322.1], [234.0, 231.5]]], description="Embedding representing an area"

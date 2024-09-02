@@ -3,6 +3,7 @@ import open_clip
 import torch
 from huggingface_hub import hf_hub_download
 from loguru import logger
+from numpy.typing import NDArray
 from PIL import Image
 from torchvision.transforms.transforms import Compose
 
@@ -20,13 +21,11 @@ model.eval()
 tokenizer = open_clip.get_tokenizer("ViT-L-14")
 
 
-def get_embeddings_from_images(images: list[list[list[list[float]]]]) -> list[list[float]]:
+def get_embeddings_from_images(images: list[NDArray[np.uint8]]) -> list[list[float]]:
     embeddings: list[list[float]] = []
     for i in range(0, len(images), config.batch_size):
         batch = images[i : i + config.batch_size]
-        images_transformed: list[torch.Tensor] = [
-            preprocess(Image.fromarray(np.array(image).astype(np.uint8).transpose(1, 2, 0))) for image in batch
-        ]
+        images_transformed: list[torch.Tensor] = [preprocess(Image.fromarray(image)) for image in batch]
         inputs = torch.stack(images_transformed).to(device)
         with torch.no_grad(), torch.cuda.amp.autocast():
             batch_embeddings = model.encode_image(inputs)
