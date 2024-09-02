@@ -19,10 +19,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 BATCH_SIZE = 100
 
+
 def process_chip(src, x, y, chip_id, chip_size, output_dir):
     window = rasterio.windows.Window(x, y, chip_size, chip_size)
     chip_data = src.read(window=window)
-
 
     # Check if the chip is empty (all zeros or ones)
     if np.all(chip_data <= 1):
@@ -47,8 +47,9 @@ def process_chip(src, x, y, chip_id, chip_size, output_dir):
         "chip_id": chip_id,
         "file_path": chip_filename,
         "geometry": bbox_geometry,
-        "image_data": chip_data  # Return the original 8-bit data for embedding
+        "image_data": chip_data,  # Return the original 8-bit data for embedding
     }
+
 
 def process_image(tiff_file, output_dir, parquet_dir):
     image_id = os.path.splitext(os.path.basename(tiff_file))[0]
@@ -71,7 +72,7 @@ def process_image(tiff_file, output_dir, parquet_dir):
             crs = src.crs
             print(f"Coordinate Reference System (CRS): {crs}")
             print(f"CRS WKT: {crs.to_wkt()}")
-            
+
             if crs.is_epsg_code:
                 print(f"EPSG Code: {crs.to_epsg()}")
 
@@ -85,10 +86,8 @@ def process_image(tiff_file, output_dir, parquet_dir):
                 for y in range(0, height, 224):
                     for x in range(0, width, 224):
                         try:
-                            chip_data = process_chip(
-                                src, x, y, len(processed_items), 224, chips_dir
-                            )
-                            
+                            chip_data = process_chip(src, x, y, len(processed_items), 224, chips_dir)
+
                             if chip_data is None:  # Skip empty chips
                                 pbar.update(1)
                                 continue
@@ -124,7 +123,7 @@ def process_image(tiff_file, output_dir, parquet_dir):
         # Process any remaining images in the batch
         if batch_images:
             embeddings = get_embeddings_batch(batch_images)
-            for item, embedding in zip(processed_items[-len(batch_images):], embeddings):
+            for item, embedding in zip(processed_items[-len(batch_images) :], embeddings):
                 item["embedding"] = embedding
 
         print(f"Processed {len(processed_items)} chips from image {image_id}")
@@ -158,6 +157,7 @@ def process_image(tiff_file, output_dir, parquet_dir):
         logging.error(f"Error processing image {image_id}: {str(e)}")
         return 0
 
+
 # Main execution
 input_dir = "./sat_data/color/"  # Replace with the path to your TIFF files
 output_dir = "image_chips"
@@ -166,7 +166,7 @@ os.makedirs(output_dir, exist_ok=True)
 os.makedirs(parquet_dir, exist_ok=True)
 
 # Get the list of TIFF files
-tiff_files = [f for f in os.listdir(input_dir) if f.lower().endswith('.tif') or f.lower().endswith('.tiff')]
+tiff_files = [f for f in os.listdir(input_dir) if f.lower().endswith(".tif") or f.lower().endswith(".tiff")]
 
 total_chips = 0
 errors = []

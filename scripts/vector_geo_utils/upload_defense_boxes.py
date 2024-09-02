@@ -125,4 +125,3 @@ def process_parquet_files(directory_path, batch_size=200):
 if __name__ == "__main__":
     directory_path = "../parquet_files"
     process_parquet_files(directory_path)
-

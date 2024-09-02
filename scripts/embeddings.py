@@ -1,5 +1,5 @@
-
 import json
+
 import requests
 
 
@@ -20,4 +20,3 @@ def get_embeddings_batch(images, gsd=0.6):
     else:
         print(f"Error getting embeddings: {response.text}")
         return [None] * len(images)
-    

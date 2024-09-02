@@ -78,7 +78,6 @@ def resize_image(image, target_size=(224, 224)):
     return image
 
 
-
 def process_chip(src, x, y, chip_id, chip_size, output_dir):
     window = rasterio.windows.Window(x, y, chip_size, chip_size)
     chip_data = src.read(window=window)
@@ -239,4 +238,3 @@ if errors:
     print(f"Encountered {len(errors)} errors:")
     for error in errors:
         print(error)
-
