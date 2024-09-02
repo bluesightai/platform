@@ -10,13 +10,17 @@ https://docs.ultralytics.com/models/fast-sam/#usage-examples
 Requirements: git+https://github.com/openai/CLIP.git
 """
 
+import base64
+import io
 import os
 import sys
+from typing import Literal
 
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
 import open_clip
+import requests
 import torch
 from huggingface_hub import hf_hub_download
 from numpy.typing import NDArray
@@ -34,14 +38,16 @@ def image_to_np_ndarray(image):
 
 
 class FastSAMPrompt:
-    def __init__(self, image, results, device="cuda"):
+    def __init__(self, image, results, device: Literal["cpu", "cuda", "api", "mps"]):
         if isinstance(image, str) or isinstance(image, Image.Image):
             image = image_to_np_ndarray(image)
-        self.device = device
-        self.results = results
         self.img = image
-        self.model, _, self.preprocess = self._load_clip_model()
-        self.tokenizer = open_clip.get_tokenizer("ViT-L-14")
+        self.results = results
+        self.device = device
+        if self.device != "api":
+            print("Loading CLIP weights!!")
+            self.model, _, self.preprocess = self._load_clip_model()
+            self.tokenizer = open_clip.get_tokenizer("ViT-L-14")
 
     def _segment_image(self, image, bbox):
         if isinstance(image, Image.Image):
@@ -123,7 +129,8 @@ class FastSAMPrompt:
         if isinstance(annotations[0], dict):
             annotations = [annotation["segmentation"] for annotation in annotations]
         image = self.img
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         original_h = image.shape[0]
         original_w = image.shape[1]
         if sys.platform == "darwin":
@@ -203,7 +210,8 @@ class FastSAMPrompt:
             buf = fig.canvas.tostring_rgb()
         cols, rows = fig.canvas.get_width_height()
         img_array = np.frombuffer(buf, dtype=np.uint8).reshape(rows, cols, 3)
-        result = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        # result = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+        result = img_array
         plt.close()
         return result
 
@@ -371,6 +379,38 @@ class FastSAMPrompt:
         model.eval()
         return model, _, preprocess
 
+    def retrieve_api(self, elements: list[Image.Image], search_text: str) -> torch.Tensor:
+        headers = {"Content-Type": "application/json"}
+
+        url = "https://api.bluesight.ai/embeddings/img"
+        payload = {"images": [], "model": "clip"}
+        for img in elements:
+
+            buffer = io.BytesIO()
+            np.save(buffer, np.array(img))
+            img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+            payload["images"].append(
+                {
+                    "bands": ["red", "green", "blue"],
+                    "gsd": 0.6,
+                    "pixels": img_base64,
+                }
+            )
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()
+        embeddings = np.array(response.json()["embeddings"])
+
+        text_url = "https://api.bluesight.ai/embeddings/text"
+        text_payload = [search_text]
+        text_response = requests.post(text_url, json=text_payload, headers=headers)
+        text_response.raise_for_status()
+        text_embedding = np.array(text_response.json()["embeddings"][0])
+
+        similarities = 100.0 * (embeddings @ text_embedding)
+
+        return torch.tensor(similarities)
+
     @torch.no_grad()
     def retrieve(self, elements: list[Image.Image], search_text: str) -> torch.Tensor:
         preprocessed_images = torch.stack([self.preprocess(image) for image in elements]).to(self.device)
@@ -387,7 +427,8 @@ class FastSAMPrompt:
     def _crop_image(
         self, format_results: list[dict]
     ) -> tuple[list[Image.Image], list[tuple[int, int, int, int]], list, list[int], list[dict]]:
-        image = Image.fromarray(cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB))
+        # image = Image.fromarray(cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB))
+        image = Image.fromarray(self.img).convert("RGB")
         ori_w, ori_h = image.size
         annotations = format_results
         mask_h, mask_w = annotations[0]["segmentation"].shape
@@ -473,12 +514,23 @@ class FastSAMPrompt:
         onemask = onemask >= 1
         return np.array([onemask])
 
-    def text_prompt(self, text: str, top_k: int = 20) -> NDArray[np.float32]:
+    def get_cropped_segments(self) -> tuple[list[tuple[int, int, int, int]], list[Image.Image]]:
+        if not self.results or not self.results[0].masks:
+            return [], []
+        format_results = self._format_results(self.results[0], 0)
+        cropped_boxes, cropped_images, not_crop, filter_id, annotations = self._crop_image(format_results)
+        # return np.array([ann["segmentation"] for ann in annotations]), cropped_boxes
+        return cropped_images, cropped_boxes
+
+    def text_prompt(self, text: str, top_k: int = 20) -> NDArray[np.bool_]:
         if self.results == None:
             return np.array([])
         format_results = self._format_results(self.results[0], 0)
         cropped_boxes, cropped_images, not_crop, filter_id, annotations = self._crop_image(format_results)
-        scores = self.retrieve(cropped_boxes, text)
+        if self.device == "api":
+            scores = self.retrieve_api(cropped_boxes, text)
+        else:
+            scores = self.retrieve(cropped_boxes, text)
         max_indices = scores.argsort(descending=True)[:top_k]
         adjusted_indices = [idx + sum(np.array(filter_id) <= int(idx)) for idx in max_indices]
         return np.array([annotations[idx]["segmentation"] for idx in adjusted_indices])
