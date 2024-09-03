@@ -25,23 +25,12 @@ import torch
 from huggingface_hub import hf_hub_download
 from numpy.typing import NDArray
 from PIL import Image
-
-
-def image_to_np_ndarray(image):
-    if type(image) is str:
-        return np.array(Image.open(image))
-    elif issubclass(type(image), Image.Image):
-        return np.array(image)
-    elif type(image) is np.ndarray:
-        return image
-    return None
+from ultralytics.engine.model import Results
 
 
 class FastSAMPrompt:
-    def __init__(self, image, results, device: Literal["cpu", "cuda", "api", "mps"]):
-        if isinstance(image, str) or isinstance(image, Image.Image):
-            image = image_to_np_ndarray(image)
-        self.img = image
+    def __init__(self, image: Image.Image, results: list[Results], device: Literal["cpu", "cuda", "api", "mps"]):
+        self.img = np.array(image)
         self.results = results
         self.device = device
         if self.device != "api":
