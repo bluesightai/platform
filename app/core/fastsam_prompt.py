@@ -14,7 +14,7 @@ import base64
 import io
 import os
 import sys
-from typing import Literal
+from typing import Literal, TypedDict
 
 import cv2
 import matplotlib.pyplot as plt
@@ -28,6 +28,14 @@ from PIL import Image
 from ultralytics.engine.model import Results
 
 
+class Annotation(TypedDict):
+    id: int
+    segmentation: NDArray[np.bool_]
+    bbox: torch.Tensor
+    score: torch.Tensor
+    area: int
+
+
 class FastSAMPrompt:
     def __init__(self, image: Image.Image, results: list[Results], device: Literal["cpu", "cuda", "api", "mps"]):
         self.img = np.array(image)
@@ -38,53 +46,47 @@ class FastSAMPrompt:
             self.model, _, self.preprocess = self._load_clip_model()
             self.tokenizer = open_clip.get_tokenizer("ViT-L-14")
 
-    def _segment_image(self, image, bbox):
-        if isinstance(image, Image.Image):
-            image_array = np.array(image)
-        else:
-            image_array = image
-
+    def _segment_image(self, image: Image.Image, bbox: tuple[int, int, int, int]) -> Image.Image:
         x1, y1, x2, y2 = bbox
+        image_array = np.array(image)
         cropped_image_array = image_array[y1:y2, x1:x2]
-
-        # Convert the cropped array back to an Image
         cropped_image = Image.fromarray(cropped_image_array)
-
         return cropped_image
 
-    def _format_results(self, result, filter=0):
-        annotations = []
+    def _format_results(self, result: Results, filter: int = 0) -> list[Annotation]:
+        annotations: list[Annotation] = []
         n = len(result.masks.data)
         for i in range(n):
-            annotation = {}
             mask = result.masks.data[i] == 1.0
 
             if torch.sum(mask) < filter:
                 continue
-            annotation["id"] = i
-            annotation["segmentation"] = mask.cpu().numpy()
-            annotation["bbox"] = result.boxes.data[i]
-            annotation["score"] = result.boxes.conf[i]
-            annotation["area"] = annotation["segmentation"].sum()
+
+            annotation: Annotation = {
+                "id": i,
+                "segmentation": mask.cpu().numpy(),
+                "bbox": result.boxes.data[i],
+                "score": result.boxes.conf[i],
+                "area": mask.cpu().numpy().sum(),
+            }
             annotations.append(annotation)
         return annotations
 
-    def filter_masks(annotations):  # filte the overlap mask
+    def filter_masks(self, annotations: list[Annotation]) -> tuple[list[Annotation], set[int]]:
         annotations.sort(key=lambda x: x["area"], reverse=True)
-        to_remove = set()
+        to_remove: set[int] = set()
         for i in range(0, len(annotations)):
             a = annotations[i]
             for j in range(i + 1, len(annotations)):
                 b = annotations[j]
                 if i != j and j not in to_remove:
-                    # check if
                     if b["area"] < a["area"]:
                         if (a["segmentation"] & b["segmentation"]).sum() / b["segmentation"].sum() > 0.8:
                             to_remove.add(j)
 
         return [a for i, a in enumerate(annotations) if i not in to_remove], to_remove
 
-    def _get_bbox_from_mask(self, mask) -> tuple[int, int, int, int]:
+    def _get_bbox_from_mask(self, mask: NDArray) -> tuple[int, int, int, int]:
         mask = mask.astype(np.uint8)
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         x1, y1, w, h = cv2.boundingRect(contours[0])
@@ -411,8 +413,8 @@ class FastSAMPrompt:
         return probs[:, 0]
 
     def _crop_image(
-        self, format_results: list[dict]
-    ) -> tuple[list[Image.Image], list[tuple[int, int, int, int]], list, list[int], list[dict]]:
+        self, format_results: list[Annotation]
+    ) -> tuple[list[Image.Image], list[tuple[int, int, int, int]], list, list[int], list[Annotation]]:
         # image = Image.fromarray(cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB))
         image = Image.fromarray(self.img).convert("RGB")
         ori_w, ori_h = image.size
@@ -420,8 +422,8 @@ class FastSAMPrompt:
         mask_h, mask_w = annotations[0]["segmentation"].shape
         if ori_w != mask_w or ori_h != mask_h:
             image = image.resize((mask_w, mask_h))
-        cropped_boxes: list[Image.Image] = []
-        cropped_images: list[tuple[int, int, int, int]] = []
+        cropped_images: list[Image.Image] = []
+        cropped_boxes: list[tuple[int, int, int, int]] = []
         not_crop: list = []
         filter_id: list[int] = []
         # annotations, _ = filter_masks(annotations)
@@ -431,11 +433,11 @@ class FastSAMPrompt:
                 filter_id.append(_)
                 continue
             bbox = self._get_bbox_from_mask(mask["segmentation"])  # mask 的 bbox
-            cropped_boxes.append(self._segment_image(image, bbox))
+            cropped_images.append(self._segment_image(image, bbox))
             # cropped_boxes.append(segment_image(image, mask["segmentation"]))
-            cropped_images.append(bbox)  # Save the bounding box of the cropped image.
+            cropped_boxes.append(bbox)  # Save the bounding box of the cropped image.
 
-        return cropped_boxes, cropped_images, not_crop, filter_id, annotations
+        return cropped_images, cropped_boxes, not_crop, filter_id, annotations
 
     def box_prompt(self, bbox=None, bboxes=None):
         if self.results == None:
@@ -500,23 +502,23 @@ class FastSAMPrompt:
         onemask = onemask >= 1
         return np.array([onemask])
 
-    def get_cropped_segments(self) -> tuple[list[tuple[int, int, int, int]], list[Image.Image]]:
+    def get_cropped_segments(self) -> tuple[list[Image.Image], list[tuple[int, int, int, int]], NDArray[np.bool_]]:
         if not self.results or not self.results[0].masks:
-            return [], []
-        format_results = self._format_results(self.results[0], 0)
-        cropped_boxes, cropped_images, not_crop, filter_id, annotations = self._crop_image(format_results)
-        # return np.array([ann["segmentation"] for ann in annotations]), cropped_boxes
-        return cropped_images, cropped_boxes
+            return [], [], np.array([])
+        annotations = self._format_results(self.results[0], 0)
+        cropped_images, bboxes, not_crop, filter_id, annotations = self._crop_image(annotations)
+        segmentation_masks = np.array([ann["segmentation"] for ann in annotations])
+        return cropped_images, bboxes, segmentation_masks
 
     def text_prompt(self, text: str, top_k: int = 20) -> NDArray[np.bool_]:
         if self.results == None:
             return np.array([])
-        format_results = self._format_results(self.results[0], 0)
-        cropped_boxes, cropped_images, not_crop, filter_id, annotations = self._crop_image(format_results)
+        annotations = self._format_results(self.results[0], 0)
+        cropped_images, bboxes, not_crop, filter_id, annotations = self._crop_image(annotations)
         if self.device == "api":
-            scores = self.retrieve_api(cropped_boxes, text)
+            scores = self.retrieve_api(cropped_images, text)
         else:
-            scores = self.retrieve(cropped_boxes, text)
+            scores = self.retrieve(cropped_images, text)
         max_indices = scores.argsort(descending=True)[:top_k]
         adjusted_indices = [idx + sum(np.array(filter_id) <= int(idx)) for idx in max_indices]
         return np.array([annotations[idx]["segmentation"] for idx in adjusted_indices])
