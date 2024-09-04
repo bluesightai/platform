@@ -564,6 +564,115 @@ async def upload_to_supabase(
             logger.debug(f"File {file_name} already exists in Supabase storage bucket {bucket_name}")
 
 
+def convert_box_xywh_to_xyxy(box):
+    if len(box) == 4:
+        return [box[0], box[1], box[0] + box[2], box[1] + box[3]]
+    else:
+        return [convert_box_xywh_to_xyxy(b) for b in box]
+
+
+def pixel_bbox_to_wkt(bbox: tuple[int, int, int, int], tile_data: TileData) -> str:
+    """Convert a pixel bounding box to WKT format using tile data."""
+    tile_width, tile_height = tile_data["tile"].size
+    nw_lat, nw_lng, se_lat, se_lng = tile_data["nw_lat"], tile_data["nw_lng"], tile_data["se_lat"], tile_data["se_lng"]
+
+    # Calculate lat/lng per pixel
+    lat_per_pixel = (se_lat - nw_lat) / tile_height
+    lng_per_pixel = (se_lng - nw_lng) / tile_width
+
+    # Convert pixel coordinates to lat/lng
+    min_lng = nw_lng + bbox[0] * lng_per_pixel
+    min_lat = nw_lat + bbox[1] * lat_per_pixel
+    max_lng = nw_lng + bbox[2] * lng_per_pixel
+    max_lat = nw_lat + bbox[3] * lat_per_pixel
+
+    # Create WKT string
+    return bbox_to_wkt((min_lng, min_lat, max_lng, max_lat))
+
+
+async def process_tile_with_segmentation(
+    tiles_ids: list[int],
+    tiles_data: list[TileData],
+    session: aiohttp.ClientSession,
+    supabase_client,
+    conn: asyncpg.Connection,
+    model: FastSAM,
+    device: Literal["cuda", "cpu", "mps"],
+    embedding_model: Literal["clip", "clay"],
+    table_name: str,
+    bucket_name: str,
+    tile_size: int,
+) -> list[int]:
+    """Process a single tile with segmentation and embedding calculation."""
+    # input_image = tile_data["tile"]
+
+    images = [tile_data["tile"] for tile_data in tiles_data]
+
+    # Perform segmentation
+    everything_results: list[Results] = model(
+        images,
+        device=device,
+        retina_masks=True,
+        imgsz=tile_size,
+        conf=0.4,
+        iou=0.9,
+    )
+
+    # prompt_process = FastSAMPrompt(input_image, everything_results, device="api")
+    # cropped_images, bboxes, segmentation_masks = prompt_process.get_cropped_segments()
+
+    all_tiles_data: list[TileData] = []
+    all_cropped_images: list[Image.Image] = []
+    all_bboxes: list[tuple[int, int, int, int]] = []
+    all_segmentation_masks: list[NDArray[np.bool_]] = []
+    all_tile_ids: list[int] = []
+
+    for tile_data, tile_id, image, results in zip(tiles_data, tiles_ids, images, everything_results):
+        prompt_process = FastSAMPrompt(image, [results], device="api")
+        cropped_images, bboxes, segmentation_masks = prompt_process.get_cropped_segments()
+
+        if not bboxes:
+            continue
+
+        all_cropped_images.extend(cropped_images)
+        all_bboxes.extend(bboxes)
+        all_segmentation_masks.extend(segmentation_masks)
+        all_tile_ids.extend([tile_id] * len(cropped_images))
+        all_tiles_data.extend([tile_data] * len(cropped_images))
+
+    embeddings = await get_embeddings(session, all_cropped_images, embedding_model)
+
+    data = []
+    for tile_data, mask, embedding, bbox, tile_id in zip(
+        all_tiles_data, all_segmentation_masks, embeddings, all_bboxes, all_tile_ids
+    ):
+        wkt_polygon = mask_to_wkt(mask, tile_data, bbox)
+        data.append((wkt_polygon, embedding, tile_id))
+
+    # Insert data into PostgreSQL
+    segment_ids = await insert_subtiles_to_postgres(conn, table_name, data)
+
+    # Upload cropped images to Supabase storage
+    upload_tasks = []
+    for segment_id, cropped_image in zip(segment_ids, all_cropped_images):
+        img_byte_arr = io.BytesIO()
+        cropped_image.save(img_byte_arr, format="PNG")
+        img_byte_arr = img_byte_arr.getvalue()
+
+        file_name = f"{segment_id}.png"
+        upload_task = upload_to_supabase(
+            supabase_client=supabase_client,
+            bucket_name=bucket_name,
+            file_name=file_name,
+            file_content=img_byte_arr,
+        )
+        upload_tasks.append(upload_task)
+
+    await asyncio.gather(*upload_tasks)
+
+    return segment_ids
+
+
 async def insert_area(
     start_lat: float = 29.7624311358678,
     start_lng: float = -95.1304100547797,
