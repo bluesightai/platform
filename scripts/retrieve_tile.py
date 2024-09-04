@@ -439,6 +439,18 @@ async def get_embeddings(
     return embeddings
 
 
+async def get_embeddings_text(
+    session: aiohttp.ClientSession,
+    texts: list[str],
+) -> list[list[float]]:
+    url = "https://api.bluesight.ai/embeddings/text"
+    headers = {"Content-Type": "application/json"}
+    async with session.post(url, json=texts, headers=headers) as response:
+        response.raise_for_status()
+        embeddings: list[list[float]] = (await response.json())["embeddings"]
+    return embeddings
+
+
 async def insert_to_postgres(
     conn: asyncpg.Connection,
     table_name: str,
