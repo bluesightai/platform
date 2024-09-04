@@ -13,16 +13,23 @@ from typing import AsyncGenerator, Literal, Optional, TypedDict
 import aiohttp
 import asyncpg
 import numpy as np
+import torch
 from fire import Fire
+from huggingface_hub import hf_hub_download
 from loguru import logger
+from numpy.typing import NDArray
 from PIL import Image
 from shapely import geometry
+from shapely.geometry import MultiPolygon, Polygon
+from skimage import measure
 from supabase import acreate_client
 from supabase.client import AsyncClient
 from tenacity import retry, stop_after_attempt, wait_exponential
 from tqdm import tqdm
+from ultralytics import FastSAM
+from ultralytics.engine.model import Results
 
-# Add this to the existing imports
+from app.core.fastsam_prompt import FastSAMPrompt
 
 
 class TileData(TypedDict):
@@ -659,8 +666,24 @@ async def insert_area(
 
                 tile_ids = await insert_to_postgres(conn=conn, table_name=table_name, data=data)
 
+                segment_ids = await process_tile_with_segmentation(
+                    tiles_ids=tile_ids,
+                    tiles_data=batch,
+                    tile_size=target_tile_size,
+                    session=session,
+                    supabase_client=supabase_client,
+                    conn=conn,
+                    model=model,
+                    device=device,
+                    embedding_model=embedding_model,
+                    table_name=table_name + "_masks",
+                    bucket_name=bucket_name + "_masks",
+                )
+                logger.info(f"Inserted {len(segment_ids)} segments into {table_name + '_masks'}")
+
                 upload_tasks = []
                 for tile_id, tile_data in zip(tile_ids, batch):
+
                     img_byte_arr = io.BytesIO()
                     tile_data["tile"].save(img_byte_arr, format="PNG")
                     img_byte_arr = img_byte_arr.getvalue()
