@@ -1,7 +1,7 @@
 import asyncio
+import base64
 import hashlib
 import io
-import json
 import math
 import os
 import urllib.parse
@@ -51,6 +51,50 @@ def bbox_to_wkt(bbox: tuple[float, float, float, float]) -> str:
     """Convert a bounding box to a WKT string"""
     minx, miny, maxx, maxy = bbox
     polygon = geometry.box(minx, miny, maxx, maxy)
+    return polygon.wkt
+
+
+def mask_to_wkt(mask: NDArray[np.bool_], tile_data: TileData, bbox: tuple[int, int, int, int]) -> str:
+    """Convert a segmentation mask to WKT format using tile data."""
+    tile_width, tile_height = tile_data["tile"].size
+    nw_lat, nw_lng, se_lat, se_lng = tile_data["nw_lat"], tile_data["nw_lng"], tile_data["se_lat"], tile_data["se_lng"]
+
+    # Calculate lat/lng per pixel
+    lat_per_pixel = (se_lat - nw_lat) / tile_height
+    lng_per_pixel = (se_lng - nw_lng) / tile_width
+
+    # Find contours in the mask
+    contours = measure.find_contours(mask, 0.5)
+
+    polygons: list[Polygon] = []
+    for contour in contours:
+        # Convert pixel coordinates to lat/lng
+        coords = []
+        for y, x in contour:
+            lng = nw_lng + x * lng_per_pixel
+            lat = nw_lat + y * lat_per_pixel
+            coords.append((lng, lat))
+
+        # Create a polygon from the coordinates
+        poly = Polygon(coords)
+        if poly.is_valid:
+            polygons.append(poly)
+
+    # # Create a MultiPolygon if there are multiple polygons
+    # if len(polygons) > 1:
+    #     multi_poly = MultiPolygon(polygons)
+    # elif len(polygons) == 1:
+    #     multi_poly = polygons[0]
+    # else:
+    #     raise ValueError("No valid polygons found in mask")
+
+    if polygons:
+        polygon = polygons[0]
+    else:
+        # Create a polygon that covers the entire tile if no valid polygons are found
+        minx, miny, maxx, maxy = bbox
+        polygon = geometry.box(minx, miny, maxx, maxy)
+
     return polygon.wkt
 
 
