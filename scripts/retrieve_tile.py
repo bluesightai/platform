@@ -416,17 +416,14 @@ async def get_embeddings(
 
     if uncached_images:
         url = "https://api.bluesight.ai/embeddings/img"
-        payload = {
-            "model": model,
-            "images": [
-                {
-                    "gsd": 0.6,
-                    "bands": ["red", "green", "blue"],
-                    "pixels": np.array(image.convert("RGB")).transpose(2, 0, 1).tolist(),
-                }
-                for image in uncached_images
-            ],
-        }
+
+        payload = {"model": model, "images": []}
+        for image in uncached_images:
+            buffer = io.BytesIO()
+            np.save(buffer, np.array(image, dtype=np.uint8))
+            img_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+            payload["images"].append({"gsd": 0.6, "bands": ["red", "green", "blue"], "pixels": img_base64})
         headers = {"Content-Type": "application/json"}
 
         async with session.post(url, json=payload, headers=headers) as response:
