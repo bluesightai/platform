@@ -493,6 +493,45 @@ async def insert_to_postgres(
     return [row["id"] for row in results]
 
 
+async def insert_subtiles_to_postgres(
+    conn: asyncpg.Connection,
+    table_name: str,
+    data: list[tuple[str, list[float], int]],
+) -> list[int]:
+    """Insert a batch of data into a PostgreSQL table.
+
+    Args:
+    conn: An asyncpg Connection object
+    table_name: The name of the table to insert the data into (must have location, embedding, and parent_tile columns)
+    data: A list of tuples containing the bounding box, embedding data, and parent_tile_id
+
+    Returns:
+    A list of IDs for the inserted rows
+    """
+    query = f"""
+    WITH input_rows(bbox, embedding, parent_tile_id) AS (
+        SELECT * FROM unnest($1::text[], $2::text[], $3::int[])
+    )
+    INSERT INTO {table_name} (location, embedding, parent_tile_id)
+    SELECT
+        ST_GeomFromText(bbox, 4326)::geography AS location,
+        embedding::vector AS embedding,
+        parent_tile_id
+    FROM input_rows
+    RETURNING id
+    """
+
+    bboxes: list[str]
+    embeddings: list[list[float]]
+    parent_tile_ids: list[int]
+    bboxes, embeddings, parent_tile_ids = zip(*data)
+    embedding_strings = [f"[{','.join(map(str, emb))}]" for emb in embeddings]
+
+    results = await conn.fetch(query, bboxes, embedding_strings, parent_tile_ids)
+
+    return [row["id"] for row in results]
+
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def upload_to_supabase(
     supabase_client: AsyncClient,
