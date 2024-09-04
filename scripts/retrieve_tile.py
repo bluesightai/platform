@@ -216,7 +216,7 @@ async def get_satellite_tile(
 
     if cache_file.exists():
         logger.debug(f"Loading tile from cache: {cache_file}")
-        img = Image.open(cache_file)
+        img = Image.open(cache_file).convert("RGB")
         nw_lat, nw_lng = from_tile_coord_to_lat_lng(x, y, zoom, img.width)
         se_lat, se_lng = from_tile_coord_to_lat_lng(x + 1, y + 1, zoom, img.width)
         return {"tile": img, "nw_lat": nw_lat, "nw_lng": nw_lng, "se_lat": se_lat, "se_lng": se_lng}
@@ -233,7 +233,8 @@ async def get_satellite_tile(
             f.write(content)
         logger.debug(f"Tile saved to cache: {cache_file}")
 
-        img = Image.open(BytesIO(content))
+        img = Image.open(BytesIO(content)).convert("RGB")
+
         nw_lat, nw_lng = from_tile_coord_to_lat_lng(x, y, zoom, img.width)
         se_lat, se_lng = from_tile_coord_to_lat_lng(x + 1, y + 1, zoom, img.width)
 
