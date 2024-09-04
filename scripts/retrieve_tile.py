@@ -604,6 +604,10 @@ async def insert_area(
     if not SUPABASE_URL or not SUPABASE_KEY:
         raise ValueError("Please set the SUPABASE_URL and SUPABASE_KEY environment variables")
 
+    model_file = hf_hub_download(repo_id="furiousteabag/FastSAM", filename="FastSAM-x.pt")
+    model = FastSAM(model_file)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
     supabase_client: AsyncClient = await acreate_client(SUPABASE_URL, SUPABASE_KEY)
 
     tiles_cache_dir = Path(f".cache/gcp_tiles/{scale}")
