@@ -413,31 +413,30 @@ class FastSAMPrompt:
         return probs[:, 0]
 
     def _crop_image(
-        self, format_results: list[Annotation]
+        self, annotations: list[Annotation]
     ) -> tuple[list[Image.Image], list[tuple[int, int, int, int]], list, list[int], list[Annotation]]:
         # image = Image.fromarray(cv2.cvtColor(self.img, cv2.COLOR_BGR2RGB))
         image = Image.fromarray(self.img).convert("RGB")
         ori_w, ori_h = image.size
-        annotations = format_results
         mask_h, mask_w = annotations[0]["segmentation"].shape
         if ori_w != mask_w or ori_h != mask_h:
             image = image.resize((mask_w, mask_h))
         cropped_images: list[Image.Image] = []
         cropped_boxes: list[tuple[int, int, int, int]] = []
         not_crop: list = []
-        filter_id: list[int] = []
+        filtered_annotations_ids: list[int] = []
         # annotations, _ = filter_masks(annotations)
         # filter_id = list(_)
-        for _, mask in enumerate(annotations):
+        for i, mask in enumerate(annotations):
             if np.sum(mask["segmentation"]) <= 100:
-                filter_id.append(_)
+                filtered_annotations_ids.append(i)
                 continue
             bbox = self._get_bbox_from_mask(mask["segmentation"])  # mask 的 bbox
             cropped_images.append(self._segment_image(image, bbox))
             # cropped_boxes.append(segment_image(image, mask["segmentation"]))
             cropped_boxes.append(bbox)  # Save the bounding box of the cropped image.
 
-        return cropped_images, cropped_boxes, not_crop, filter_id, annotations
+        return cropped_images, cropped_boxes, not_crop, filtered_annotations_ids, annotations
 
     def box_prompt(self, bbox=None, bboxes=None):
         if self.results == None:
@@ -506,8 +505,10 @@ class FastSAMPrompt:
         if not self.results or not self.results[0].masks:
             return [], [], np.array([])
         annotations = self._format_results(self.results[0], 0)
-        cropped_images, bboxes, not_crop, filter_id, annotations = self._crop_image(annotations)
-        segmentation_masks = np.array([ann["segmentation"] for ann in annotations])
+        cropped_images, bboxes, not_crop, filtered_annotations_ids, annotations = self._crop_image(annotations)
+        segmentation_masks = np.array(
+            [mask["segmentation"] for i, mask in enumerate(annotations) if i not in filtered_annotations_ids]
+        )
         return cropped_images, bboxes, segmentation_masks
 
     def text_prompt(self, text: str, top_k: int = 20) -> NDArray[np.bool_]:
