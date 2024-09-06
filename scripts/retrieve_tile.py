@@ -385,6 +385,7 @@ def get_cache_path(image: Image.Image, model: str, cache_dir: Path) -> Path:
     return cache_dir / model / f"{width}x{height}" / f"{img_hash}.npy"
 
 
+@retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def get_embeddings(
     session: aiohttp.ClientSession,
     images: list[Image.Image],
