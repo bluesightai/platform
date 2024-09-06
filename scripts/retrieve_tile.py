@@ -76,7 +76,7 @@ def mask_to_wkt(mask: NDArray[np.bool_], tile_data: TileData, bbox: tuple[int, i
     polygons: list[Polygon] = []
     for contour in contours:
         # Convert pixel coordinates to lat/lng
-        coords = []
+        coords: list[tuple[float, float]] = []
         for y, x in contour:
             lng = nw_lng + x * lng_per_pixel
             lat = nw_lat + y * lat_per_pixel
@@ -634,11 +634,25 @@ async def process_tile_with_segmentation(
         if not bboxes:
             continue
 
+        if not all(len(lst) == len(cropped_images) for lst in [bboxes, segmentation_masks]):
+            logger.error(
+                f"Error processing tile {tile_id}: Length mismatch (images: {len(cropped_images)}, bboxes: {len(bboxes)}, masks: {len(segmentation_masks)})"
+            )
+            continue
+
         all_cropped_images.extend(cropped_images)
         all_bboxes.extend(bboxes)
         all_segmentation_masks.extend(segmentation_masks)
         all_tile_ids.extend([tile_id] * len(cropped_images))
         all_tiles_data.extend([tile_data] * len(cropped_images))
+
+    assert (
+        len(all_cropped_images)
+        == len(all_bboxes)
+        == len(all_segmentation_masks)
+        == len(all_tile_ids)
+        == len(all_tiles_data)
+    )
 
     embeddings = await get_embeddings(session, all_cropped_images, embedding_model)
 
