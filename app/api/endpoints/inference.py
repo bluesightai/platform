@@ -1,4 +1,7 @@
+from copy import deepcopy
 import pickle
+import io
+import base64
 from datetime import datetime
 from typing import List, Tuple
 
@@ -13,7 +16,7 @@ from app.api.deps import SessionDep
 from app.api.endpoints.embeddings import get_embeddings_with_images
 from app.api.endpoints.models import download_model
 from app.config import config
-from app.schemas.clay import ClassificationLabels, EmbeddingsRequest, Images, InferenceData, SegmentationLabels
+from app.schemas.clay import ClassificationLabels, EmbeddingsRequestBase, Images, InferenceData, SegmentationLabels
 from app.utils.logging import LoggingRoute
 from clay.train import SegmentationDataModuleInference, SegmentorTraining, predict_classification
 
@@ -32,7 +35,14 @@ async def run_trained_model_inference(
         with open(local_model_path, "rb") as f:
             model = pickle.load(f)
 
-        embeddings = await get_embeddings_with_images(EmbeddingsRequest(images=data.images), session)
+        processed_images = []
+        for img_dict in data.images:
+            img = deepcopy(img_dict.model_dump())
+            buffer = io.BytesIO()
+            np.save(buffer, np.array(img["pixels"]))
+            img["pixels"] = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            processed_images.append(img)
+        embeddings = await get_embeddings_with_images(EmbeddingsRequestBase(images=processed_images), session)
         labels = predict_classification(clf=model, embeddings=np.array(embeddings.embeddings))
         return ClassificationLabels(labels=labels.tolist())
     elif model_metadata.task == "segmentation":
@@ -57,6 +67,7 @@ async def run_trained_model_inference(
             elif (len(image.pixels), len(image.pixels[0]), len(image.pixels[0][0])) != pixel_shape:
                 raise ValueError("Inconsistent pixel shapes across images")
 
+            # pixels.append(np.load(io.BytesIO(base64.b64decode(image.pixels))))
             pixels.append(image.pixels)
             points.append(image.point)
             datetimes.append(datetime.fromtimestamp(image.timestamp) if image.timestamp else None)

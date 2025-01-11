@@ -41,8 +41,8 @@ async def get_embeddings_with_images(images: EmbeddingsRequestBase, session: Ses
         #     raise ValueError("Inconsistent pixel shapes across images")
 
         img_array = np.load(io.BytesIO(base64.b64decode(image.pixels)))
-        if len(img_array.shape) != len(bands):
-            raise ValueError(f"Expected {len(bands)} bands, got {len(img_array.shape)}")
+        if img_array.shape[0] != len(bands):
+            raise ValueError(f"Expected {len(bands)} bands, got {img_array.shape[0]}")
         pixels.append(img_array)
         points.append(image.point)
         datetimes.append(datetime.fromtimestamp(image.timestamp) if image.timestamp else None)
