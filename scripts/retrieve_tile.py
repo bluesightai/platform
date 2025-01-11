@@ -459,6 +459,7 @@ async def get_embeddings_text(
     return embeddings
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def insert_to_postgres(
     conn: asyncpg.Connection,
     table_name: str,
@@ -501,10 +502,14 @@ async def insert_to_postgres(
     return [row["id"] for row in results]
 
 
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
 async def insert_subtiles_to_postgres(
     conn: asyncpg.Connection,
     table_name: str,
-    data: list[tuple[str, list[float], int]],
+    locations: list[str],
+    embeddings: list[list[float]],
+    parent_tile_ids: list[int],
+    bounding_boxes: list[str],
 ) -> list[int]:
     """Insert a batch of data into a PostgreSQL table.
 
@@ -517,27 +522,68 @@ async def insert_subtiles_to_postgres(
     A list of IDs for the inserted rows
     """
     query = f"""
-    WITH input_rows(bbox, embedding, parent_tile_id) AS (
-        SELECT * FROM unnest($1::text[], $2::text[], $3::int[])
+    WITH input_rows(location_str, embedding, parent_tile_id, bounding_box_str) AS (
+        SELECT * FROM unnest($1::text[], $2::text[], $3::int[], $4::text[])
     )
-    INSERT INTO {table_name} (location, embedding, parent_tile_id)
+    INSERT INTO {table_name} (location, embedding, parent_tile_id, bounding_box)
     SELECT
-        ST_GeomFromText(bbox, 4326)::geography AS location,
+        ST_GeomFromText(location_str, 4326)::geography AS location,
         embedding::vector AS embedding,
-        parent_tile_id
+        parent_tile_id,
+        ST_GeomFromText(bounding_box_str, 4326)::geography AS bounding_box
     FROM input_rows
     RETURNING id
     """
 
-    bboxes: list[str]
-    embeddings: list[list[float]]
-    parent_tile_ids: list[int]
-    bboxes, embeddings, parent_tile_ids = zip(*data)
     embedding_strings = [f"[{','.join(map(str, emb))}]" for emb in embeddings]
 
-    results = await conn.fetch(query, bboxes, embedding_strings, parent_tile_ids)
+    results = await conn.fetch(query, locations, embedding_strings, parent_tile_ids, bounding_boxes)
 
     return [row["id"] for row in results]
+
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
+async def find_ids_by_embeddings(
+    conn: asyncpg.Connection,
+    table_name: str,
+    embeddings: list[list[float]],
+) -> list[int | None]:
+
+    query = f"""
+        SELECT c.id
+        FROM unnest($1::vector[]) WITH ORDINALITY AS e(embedding, idx)
+        LEFT JOIN LATERAL (
+            SELECT id
+            FROM {table_name}
+            WHERE embedding <=> e.embedding = 0
+            LIMIT 1
+        ) c ON true
+        ORDER BY e.idx
+    """
+
+    embedding_strings = [f"[{','.join(map(str, emb))}]" for emb in embeddings]
+
+    results = await conn.fetch(query, embedding_strings)
+
+    return [row["id"] for row in results]
+
+
+async def update_locations(
+    conn: asyncpg.Connection, table_name: str, ids: list[int], locations: list[str], bounding_boxes: list[str]
+) -> None:
+    query = f"""
+        WITH input_rows(id, location, bounding_box) AS (
+            SELECT * FROM unnest($1::int[], $2::text[], $3::text[])
+        )
+        UPDATE {table_name} t
+        SET 
+            location = ST_GeomFromText(i.location, 4326)::geography,
+            bounding_box = ST_GeomFromText(i.bounding_box, 4326)::geography
+        FROM input_rows i
+        WHERE t.id = i.id
+    """
+
+    await conn.execute(query, ids, locations, bounding_boxes)
 
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
@@ -604,8 +650,7 @@ async def process_tile_with_segmentation(
     bucket_name: str,
     tile_size: int,
 ) -> list[int]:
-    """Process a single tile with segmentation and embedding calculation."""
-    # input_image = tile_data["tile"]
+    """Process a batch of tiles with segmentation and insert the results into a PostgreSQL database."""
 
     images = [tile_data["tile"] for tile_data in tiles_data]
 
@@ -618,9 +663,6 @@ async def process_tile_with_segmentation(
         conf=0.4,
         iou=0.9,
     )
-
-    # prompt_process = FastSAMPrompt(input_image, everything_results, device="api")
-    # cropped_images, bboxes, segmentation_masks = prompt_process.get_cropped_segments()
 
     all_tiles_data: list[TileData] = []
     all_cropped_images: list[Image.Image] = []
@@ -657,15 +699,23 @@ async def process_tile_with_segmentation(
 
     embeddings = await get_embeddings(session, all_cropped_images, embedding_model)
 
-    data = []
+    locations: list[str] = []
+    bounding_boxes: list[str] = []
     for tile_data, mask, embedding, bbox, tile_id in zip(
         all_tiles_data, all_segmentation_masks, embeddings, all_bboxes, all_tile_ids
     ):
-        wkt_polygon = mask_to_wkt(mask, tile_data, bbox)
-        data.append((wkt_polygon, embedding, tile_id))
+        locations.append(mask_to_wkt(mask, tile_data, bbox))
+        bounding_boxes.append(pixel_bbox_to_wkt(bbox, tile_data))
 
     # Insert data into PostgreSQL
-    segment_ids = await insert_subtiles_to_postgres(conn, table_name, data)
+    segment_ids = await insert_subtiles_to_postgres(
+        conn=conn,
+        table_name=table_name,
+        locations=locations,
+        embeddings=embeddings,
+        parent_tile_ids=all_tile_ids,
+        bounding_boxes=bounding_boxes,
+    )
 
     # Upload cropped images to Supabase storage
     upload_tasks = []
@@ -707,6 +757,7 @@ async def insert_area(
     LA port: 33.78120548898004, -118.32824973224359, 33.69450702401006, -118.13318898292924
     NY bay: 40.70484394607446, -74.19615310512826, 40.61944007176511, -73.97058948914278
     Houston port: 29.7624311358678, -95.1304100547797, 29.585439488973286, -94.96849737842977
+    Bay Area: 37.811219311975265, -122.52665573314543, 37.214371411392236, -121.722707253222
 
     Args:
     start_lat: The latitude of the top-left corner of the bounding bbox
@@ -774,6 +825,7 @@ async def insert_area(
 
     logger.info(f"Processing tiles and inserting into database in batches of {batch_size}")
     conn = await asyncpg.connect(postgres_uri, statement_cache_size=0)
+
     async with aiohttp.ClientSession() as session:
         batch: list[TileData] = []
         async for tile in tiles_generator:
@@ -835,7 +887,40 @@ async def insert_area(
                 for tile, embedding in zip(batch, batch_embeddings)
             ]
 
-            await insert_to_postgres(conn=conn, table_name=table_name, data=data)
+            tile_ids = await insert_to_postgres(conn=conn, table_name=table_name, data=data)
+
+            segment_ids = await process_tile_with_segmentation(
+                tiles_ids=tile_ids,
+                tiles_data=batch,
+                tile_size=target_tile_size,
+                session=session,
+                supabase_client=supabase_client,
+                conn=conn,
+                model=model,
+                device=device,
+                embedding_model=embedding_model,
+                table_name=table_name + "_masks",
+                bucket_name=bucket_name + "_masks",
+            )
+            logger.info(f"Inserted {len(segment_ids)} segments into {table_name + '_masks'}")
+
+            upload_tasks = []
+            for tile_id, tile_data in zip(tile_ids, batch):
+
+                img_byte_arr = io.BytesIO()
+                tile_data["tile"].save(img_byte_arr, format="PNG")
+                img_byte_arr = img_byte_arr.getvalue()
+
+                file_name = f"{tile_id}.png"
+                upload_task = upload_to_supabase(
+                    supabase_client=supabase_client,
+                    bucket_name=bucket_name,
+                    file_name=file_name,
+                    file_content=img_byte_arr,
+                )
+                upload_tasks.append(upload_task)
+
+            await asyncio.gather(*upload_tasks)
 
     await conn.close()
 
