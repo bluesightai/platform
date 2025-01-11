@@ -49,7 +49,7 @@ jobs:
 
   deploy:
     env:
-      DOCKER_COMPOSE_PATH: '/root/clay/'
+      DOCKER_COMPOSE_PATH: '/root/bluesight_platform/'
     needs: build
     runs-on: ubuntu-latest
     steps:
