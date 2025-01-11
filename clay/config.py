@@ -12,7 +12,7 @@ class Config(BaseSettings):
     hub_filename: str = "clay-v1-base.ckpt"
     platform: str = "naip"
     stac_api_url: str = "https://planetarycomputer.microsoft.com/api/stac/v1"
-    batch_size: int = 512
+    batch_size: int = 128
     clip_hub_repo_id: str = "furiousteabag/SkyCLIP"
     clip_hub_filename: str = "SkyCLIP_ViT_L14_top30pct_filtered_by_CLIP_laion_RS_epoch_20.pt"
     # platform: str = "sentinel-2-l2a"
