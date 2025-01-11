@@ -20,7 +20,7 @@ RUN poetry config virtualenvs.create false && poetry install --no-root --no-inte
 # Loading clay model weights
 RUN python -c "\
 from huggingface_hub import hf_hub_download; \
-hf_hub_download(repo_id='made-with-clay/Clay', filename='clay-v1-base.ckpt'); \
+hf_hub_download(repo_id='made-with-clay/Clay', filename='v1/clay-v1-base.ckpt'); \
 hf_hub_download(repo_id='furiousteabag/FastSAM', filename='FastSAM-x.pt'); \
 hf_hub_download(repo_id='furiousteabag/SkyCLIP', filename='SkyCLIP_ViT_L14_top30pct_filtered_by_CLIP_laion_RS_epoch_20.pt')"
 

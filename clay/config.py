@@ -9,7 +9,7 @@ class Config(BaseSettings):
     """These values may be overriden by envs"""
 
     hub_repo_id: str = "made-with-clay/Clay"
-    hub_filename: str = "clay-v1-base.ckpt"
+    hub_filename: str = "v1/clay-v1-base.ckpt"
     platform: str = "naip"
     stac_api_url: str = "https://planetarycomputer.microsoft.com/api/stac/v1"
     batch_size: int = 128
